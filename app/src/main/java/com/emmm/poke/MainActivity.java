@@ -18,6 +18,10 @@ import com.emmm.poke.databinding.ActivityMainBinding;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.emmm.poke.server.*;
+
+import java.io.IOException;
+
 public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
@@ -43,6 +47,13 @@ public class MainActivity extends AppCompatActivity {
                         .setAction("Action", null).show();
             }
         });
+
+        LocalServer s = new LocalServer(8888);
+        try {
+            s.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override

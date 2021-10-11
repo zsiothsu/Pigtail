@@ -10,6 +10,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.emmm.poke.utils.GameOperation;
+import com.emmm.poke.server.TokenEncrypt;
 
 import fi.iki.elonen.*;
 
@@ -120,13 +121,17 @@ class OneGame {
 public class LocalServer extends NanoHTTPD implements GameServer {
     /* {uuid, OneGame} */
     HashMap<String, OneGame> gameList;
+    /* {ID, token} */
+    HashMap<Integer, String> playerList;
     int cnt;
+    int cnt_player;
 
     private static final String MIME_JSON = "application/json";
 
     public LocalServer(int port) {
         super(port);
         this.cnt = 0;
+        this.cnt_player = 0;
     }
 
     private Response return404() {
@@ -142,7 +147,36 @@ public class LocalServer extends NanoHTTPD implements GameServer {
 
             /* login service*/
             if (path[0].equals("api") && path[1].equals("user")) {
+                try {
+                    session.parseBody(new HashMap<String, String>());
+                    String body = session.getQueryParameterString();
+                    JSONObject json = new JSONObject(body);
 
+                    String student_id = json.getString("student_id");
+                    String password = json.getString("password");
+
+                    String token = TokenEncrypt.encode(student_id + (new Date()).toString() + password);
+                    this.playerList.put(cnt_player++, token);
+
+                    JSONObject res = new JSONObject();
+                    res.put("status", 200);
+                    res.put("message", "Success");
+
+                    JSONObject data = new JSONObject();
+                    JSONObject detail = new JSONObject();
+                    detail.put("id", cnt_player - 1);
+                    detail.put("name", "本地" + String.valueOf(cnt_player - 1));
+                    detail.put("student_id", student_id);
+                    data.put("detail", detail);
+                    data.put("token", token);
+                    res.put("data", data);
+
+                    return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, MIME_JSON, res.toString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (ResponseException | JSONException e) {
+                    e.printStackTrace();
+                }
             }
             /* game logic */
             else if (path[0].equals("api") && path[1].equals("game")) {
