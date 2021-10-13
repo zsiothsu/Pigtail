@@ -26,6 +26,8 @@ public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
+    public static LocalServer s;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
