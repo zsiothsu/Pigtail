@@ -1,11 +1,14 @@
 package com.emmm.poke;
 
+import android.content.res.Resources;
 import android.os.Bundle;
 
+import com.emmm.poke.client.Player;
 import com.google.android.material.snackbar.Snackbar;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.os.StrictMode;
 import android.view.View;
 
 import androidx.navigation.NavController;
@@ -49,6 +52,21 @@ public class MainActivity extends AppCompatActivity {
                         .setAction("Action", null).show();
             }
         });
+
+        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
+                .detectDiskReads()
+                .detectDiskWrites()
+                .detectNetwork()
+                .penaltyLog()
+                .build());
+        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
+                .detectLeakedSqlLiteObjects()
+                .detectLeakedClosableObjects()
+                .penaltyLog()
+                .penaltyDeath()
+                .build());
+
+
     }
 
     @Override

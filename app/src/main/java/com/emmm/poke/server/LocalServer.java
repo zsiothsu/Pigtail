@@ -11,29 +11,15 @@ import java.text.SimpleDateFormat;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.emmm.poke.utils.GameOperation;
+import com.emmm.poke.utils.*;
 
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.router.*;
 
-class Tuple<A, B, C> {
-    public final A first;
-    public final B second;
-    public final C third;
-
-    public Tuple(A a, B b, C c) {
-        this.first = a;
-        this.second = b;
-        this.third = c;
-    }
-}
-
 class OneGame {
     /******************************************
-     *           enumeration class            *
+     *            const variable              *
      ******************************************/
-    enum GameStatus {WAITING, READY, PLAYING, OVER}
-
     public static final String[] card_new = {
             "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "SJ", "SQ", "SK",
             "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "HJ", "HQ", "HK",
@@ -280,7 +266,7 @@ class OneGame {
     }
 }
 
-public class LocalServer extends RouterNanoHTTPD implements GameServer {
+public class LocalServer extends RouterNanoHTTPD {
     /* {uuid, OneGame} */
     public static HashMap<String, OneGame> gameList = new HashMap<>();
     /* {ID, token} */
@@ -561,7 +547,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
                 int id = LocalServer.playerList.get(token);
 
-                if(game.getGameStatus() == OneGame.GameStatus.PLAYING || game.getGameStatus() == OneGame.GameStatus.READY) {
+                if(game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.READY) {
                     try {
                         Tuple<Boolean, String, String> opres = game.operate(id, type == 0 ? GameOperation.turnOver : GameOperation.putCard, card);
                         if (!opres.first) {
@@ -593,10 +579,10 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
-                } else if(game.getGameStatus() == OneGame.GameStatus.OVER) {
+                } else if(game.getGameStatus() == GameStatus.OVER) {
                     String msg = "{\"code\":401,\"data\":{\"err_msg\":\"对局已结束\"}, \"msg\":\"鉴权失败\"}";
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
-                } else if(game.getGameStatus() == OneGame.GameStatus.WAITING) {
+                } else if(game.getGameStatus() == GameStatus.WAITING) {
                     String msg = "{\"code\":403,\"data\":{\"err_msg\":\"人还没齐\"}, \"msg\":\"非法操作\"}";
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
                 }
@@ -626,7 +612,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
                 int id = LocalServer.playerList.get(token);
 
                 try {
-                    if (game.getGameStatus() == OneGame.GameStatus.PLAYING || game.getGameStatus() == OneGame.GameStatus.OVER) {
+                    if (game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.OVER) {
                         Tuple<String, String, Integer> last = game.getLast();
 
                         JSONObject res = new JSONObject();
@@ -637,15 +623,15 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
                         data.put("your_turn", game.getTurn(id));
 
-                        res.put("code", game.getGameStatus() == OneGame.GameStatus.PLAYING ? 200 : 401);
+                        res.put("code", game.getGameStatus() == GameStatus.PLAYING ? 200 : 401);
                         res.put("data", data);
                         res.put("msg", "操作成功");
 
-                        return NanoHTTPD.newFixedLengthResponse(game.getGameStatus() == OneGame.GameStatus.PLAYING ? Response.Status.OK : Response.Status.UNAUTHORIZED, getMimeType(), res.toString());
-                    } else if (game.getGameStatus() == OneGame.GameStatus.READY) {
+                        return NanoHTTPD.newFixedLengthResponse(game.getGameStatus() == GameStatus.PLAYING ? Response.Status.OK : Response.Status.UNAUTHORIZED, getMimeType(), res.toString());
+                    } else if (game.getGameStatus() == GameStatus.READY) {
                         String msg = "{\"code\":200,\"data\":{\"last_code\":\"\", \"last_msg\": \"对局刚开始\", \"your_turn\": true}, \"msg\":\"操作成功\"}";
                         return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), msg);
-                    } else if (game.getGameStatus() == OneGame.GameStatus.WAITING) {
+                    } else if (game.getGameStatus() == GameStatus.WAITING) {
                         String msg = "{\"code\":403,\"data\":{\"err_msg\":\"人还没齐\"}, \"msg\":\"非法操作\"}";
                         return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
                     }
@@ -705,18 +691,6 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
         gameList.put(guuid, game);
 
         return guuid;
-    }
-
-    public static String joinGame(int id, String uuid) {
-        return null;
-    }
-
-    public static boolean operate(int id, String uuid, GameOperation op, String card) {
-        return true;
-    }
-
-    public static String getLastOp(int id, String uuid) {
-        return null;
     }
 }
 
