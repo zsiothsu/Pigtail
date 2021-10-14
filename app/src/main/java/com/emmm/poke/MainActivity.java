@@ -26,7 +26,7 @@ public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
-    public static LocalServer s;
+    public static LocalServer s = LocalServer.server;
 
 
     @Override
@@ -49,13 +49,6 @@ public class MainActivity extends AppCompatActivity {
                         .setAction("Action", null).show();
             }
         });
-
-        LocalServer s = new LocalServer(8888);
-        try {
-            s.start();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     @Override

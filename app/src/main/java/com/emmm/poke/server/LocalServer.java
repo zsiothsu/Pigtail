@@ -1,22 +1,17 @@
 package com.emmm.poke.server;
 
-import android.accessibilityservice.FingerprintGestureController;
 import android.annotation.SuppressLint;
-import android.app.GameManager;
-import android.util.Pair;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
-import java.security.PrivateKey;
 import java.util.*;
 import java.text.SimpleDateFormat;
-import java.util.stream.IntStream;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.emmm.poke.MainActivity;
 import com.emmm.poke.utils.GameOperation;
-import com.emmm.poke.server.TokenEncrypt;
 
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.router.*;
@@ -63,9 +58,9 @@ class OneGame {
     public boolean private_status;
     public boolean finished;
 
-    private GameStatus gameStatus;
-    private int turn;
-    private int winner;
+    public GameStatus gameStatus;
+    public int turn;
+    public int winner;
 
 
     /* player information */
@@ -80,21 +75,20 @@ class OneGame {
      ******************************************/
     public OneGame(int ID, String uuid, boolean private_status) {
         @SuppressLint("SimpleDateFormat")
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-ddTHH:mm:ss.SSSZ");
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
         this.card_placement = new Stack<String>();
         this.card_at_p1 = new Vector<String>();
         this.card_at_p2 = new Vector<String>();
         this.gameStatus = GameStatus.WAITING;
         this.ID = ID;
-        this.create_at = formatter.format(new Date());
         this.updated_at = null;
         this.deleted_at = null;
         this.uuid = uuid;
         this.private_status = private_status;
         this.finished = false;
 
-        this.turn = -1;
+        this.turn = 0;
         this.winner = -1;
 
         host_id = 0;
@@ -103,12 +97,17 @@ class OneGame {
         this.log = new Vector<String>();
         this.log_msg = new Vector<String>();
 
+        this.create_at = formatter.format(new Date()).trim();
+        String[] timestr = this.create_at.split(" ");
+        this.create_at = timestr[0] + "T" + timestr[1] + "Z";
+
         /* shuffle card */
         Vector<String> card_group_new = new Vector<String>(Arrays.asList(card_new));
         Random ran = new Random(new Date().getTime());
         int len = card_group_new.size();
-        for (int i = 0; i < card_group_new.size(); i++) {
+        for (int i = 0; i < len; i++) {
             int k = ran.nextInt() % (i + 1);
+            k = k < 0 ? -k : k;
             String t = card_group_new.get(k);
             card_group_new.set(k, card_group_new.get(i));
             card_group_new.set(i, t);
@@ -152,32 +151,32 @@ class OneGame {
             return new Tuple<Boolean, String, String>(false, "对局已结束", new String());
         }
 
-        int id = player_id == host_id ? 0 : 1;
-        String id_string = id == 0 ? "P1" : "P2";
-        String op_string = op == GameOperation.turnOver ? "从\u003c牌库\u003e翻开了一张" : "从\u003c手牌\u003e打出了一张";
-        String res = null;
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-ddTHH:mm:ss.SSSZ");
+        int turn_bak = turn;
 
-        if (this.gameStatus == GameStatus.READY) {
-            this.gameStatus = GameStatus.PLAYING;
-        } else {
-            if (id != turn) {
+        if (this.gameStatus == GameStatus.PLAYING) {
+            if (!(turn == 0 ? (host_id == player_id) : (guest_id == player_id))) {
                 return new Tuple<Boolean, String, String>(false, "还不是你的回合", new String());
             }
         }
 
+        int id = turn;
+        String id_string = id == 0 ? "P1" : "P2";
+        String op_string = op == GameOperation.turnOver ? "从\u003c牌库\u003e翻开了一张" : "从\u003c手牌\u003e打出了一张";
+        String res = null;
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
         if (op == GameOperation.turnOver) {
-            String new_card = this.card_group.peek();
+            String new_card = this.card_group.pop();
             String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
 
             card = new_card;
             this.card_placement.push(new_card);
 
-            if (!(old_top == null) && old_top.equals(new_card)) {
-                Vector<String> player_card_group = id == 0 ? this.card_at_p1 : this.card_at_p2;
+            if (!(old_top == null) && old_top.charAt(0) == new_card.charAt(0)) {
+                Vector<String> player_card_group = turn == 0 ? this.card_at_p1 : this.card_at_p2;
 
                 while (!this.card_placement.empty()) {
-                    player_card_group.add(this.card_group.pop());
+                    player_card_group.add(this.card_placement.pop());
                 }
 
                 res = " 并拿走了\u003c放置区\u003e的卡牌";
@@ -186,13 +185,23 @@ class OneGame {
             if (this.card_group.empty()) {
                 this.gameStatus = GameStatus.OVER;
 
-                if(this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 0;
-                else if(this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 1;
+                if (this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 0;
+                else if (this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 1;
                 else this.winner = -1;
 
                 this.finished = true;
             }
 
+            if (this.gameStatus == GameStatus.READY) {
+                this.turn = player_id == host_id ? 1 : 0;
+                this.gameStatus = GameStatus.PLAYING;
+            } else {
+                this.turn = (this.turn + 1) % 2;
+            }
+
+            id = (this.turn + 1) % 2;
+            id_string = id == 0 ? "P1" : "P2";
+
             String code = id + " 0 " + card;
             String msg = id_string + " " + op_string + " " + card;
             if (res != null) msg += res;
@@ -200,30 +209,39 @@ class OneGame {
             this.log.add(code);
             this.log_msg.add(msg);
 
-            if (this.gameStatus == GameStatus.READY) {
-                this.turn = player_id == host_id ? 1 : 0;
-            } else {
-                this.turn = (this.turn + 1) % 2;
-            }
 
-            this.updated_at = formatter.format(new Date());
+            this.updated_at = formatter.format(new Date()).trim();
+            String[] timestr = this.updated_at.split(" ");
+            this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
+
             return new Tuple<Boolean, String, String>(true, code, msg);
         } else {
             String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
-            Vector<String> player_card_group = id == 0 ? this.card_at_p1 : this.card_at_p2;
+            Vector<String> player_card_group = turn == 0 ? this.card_at_p1 : this.card_at_p2;
 
-            if(card == null || !player_card_group.contains(card)) {
+            if (card == null || !player_card_group.contains(card)) {
                 this.gameStatus = GameStatus.READY;
+                this.turn = turn_bak;
                 return new Tuple<Boolean, String, String>(false, "非法操作", new String());
             }
             this.card_placement.push(card);
 
-            if (!(old_top == null) && old_top.equals(card)) {
+            if (!(old_top == null) && old_top.charAt(0) == card.charAt(0)) {
                 while (!this.card_placement.empty()) {
-                    player_card_group.add(this.card_group.pop());
+                    player_card_group.add(this.card_placement.pop());
                 }
                 res = " 并拿走了\u003c放置区\u003e的卡牌";
             }
+
+            if (this.gameStatus == GameStatus.READY) {
+                this.turn = player_id == host_id ? 1 : 0;
+                this.gameStatus = GameStatus.PLAYING;
+            } else {
+                this.turn = (this.turn + 1) % 2;
+            }
+
+            id = (this.turn + 1) % 2;
+            id_string = id == 0 ? "P1" : "P2";
 
             String code = id + " 0 " + card;
             String msg = id_string + " " + op_string + " " + card;
@@ -232,13 +250,10 @@ class OneGame {
             this.log.add(code);
             this.log_msg.add(msg);
 
-            if (this.gameStatus == GameStatus.READY) {
-                this.turn = player_id == host_id ? 1 : 0;
-            } else {
-                this.turn = (this.turn + 1) % 2;
-            }
+            this.updated_at = formatter.format(new Date()).trim();
+            String[] timestr = this.updated_at.split(" ");
+            this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
 
-            this.updated_at = formatter.format(new Date());
             return new Tuple<Boolean, String, String>(true, code, msg);
         }
     }
@@ -253,15 +268,15 @@ class OneGame {
 
     public Tuple<String, String, Integer> getLast() {
         /* <log, log_msg, turn now> */
-        if(this.updated_at != null) {
+        if (this.updated_at != null) {
             return new Tuple<String, String, Integer>(log.lastElement(), this.log_msg.lastElement(), turn);
         }
 
         return new Tuple<String, String, Integer>(new String(), new String(), 0);
     }
 
-    public int getTurn() {
-        return this.turn;
+    public boolean getTurn(int id) {
+        return (this.turn == 0 ? (this.host_id == id) : (this.guest_id == id));
     }
 }
 
@@ -273,12 +288,20 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
     public static int cnt = 0;
     public static int cnt_player = 0;
 
+    public static LocalServer server = new LocalServer(8888);
+
     public LocalServer(int port) {
         super(port);
         cnt = 0;
-        cnt_player = 0;
+        cnt_player = 1;
 
         addMappings();
+
+        try {
+            this.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static class LoginHandler extends DefaultHandler {
@@ -372,23 +395,27 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
         @Override
         public Response post(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
-            String token = session.getHeaders().get("Authorization");
+            String token = session.getHeaders().get("authorization");
 
             /* unauthorized */
             if (token == null ||
                     !LocalServer.playerList.containsKey(token)) {
-                return NanoHTTPD.newFixedLengthResponse(getStatus(), "application/json", token);
+                return NanoHTTPD.newFixedLengthResponse(getStatus(), "application/json", getText());
             }
 
             boolean pri = false;
 
             try {
-                session.parseBody(new HashMap<>());
+                HashMap<String, String> map = new HashMap<>();
+                session.parseBody(map);
 
-                String body = session.getQueryParameterString();
-                JSONObject query = new JSONObject(body);
+                String body = map.toString();
+                JSONObject query = null;
+                if (body != null) {
+                    query = new JSONObject(body);
+                }
 
-                if (!query.isNull("private")) {
+                if (query != null && !query.isNull("private")) {
                     pri = query.getBoolean("private");
                 }
 
@@ -396,7 +423,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
                 /* nothing to be done */
             }
 
-            String uuid = createGame(token, pri);
+            String uuid = createGame(LocalServer.playerList.get(token), pri);
 
             JSONObject res = new JSONObject();
             JSONObject data = new JSONObject();
@@ -409,8 +436,8 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
                 res.put("msg", "操作成功");
 
 
-                MainActivity.s.addRoute("/api/game/" + uuid, LocalServer.GameHandler.class);
-                MainActivity.s.addRoute("/api/game/" + uuid + "/last", LocalServer.GameHandler.class);
+                server.addMapping("/api/game/" + uuid, LocalServer.GameHandler.class);
+                server.addMapping("/api/game/" + uuid + "/last", LocalServer.GameHandler.class);
                 return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", res.toString());
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -441,7 +468,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
         @Override
         public Response post(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
-            String token = session.getHeaders().get("Authorization");
+            String token = session.getHeaders().get("authorization");
 
             /* unauthorized */
             if (token == null ||
@@ -483,7 +510,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
         @Override
         public Response put(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
-            String token = session.getHeaders().get("Authorization");
+            String token = session.getHeaders().get("authorization");
 
             /* unauthorized */
             if (token == null ||
@@ -500,9 +527,13 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
             String card = null;
 
             try {
-                session.parseBody(new HashMap<>());
+                HashMap<String, String> map = new HashMap<>();
+                session.parseBody(map);
 
-                String body = session.getQueryParameterString();
+                String filename = map.get("content");
+                BufferedReader reader = new BufferedReader(new FileReader(filename));
+                String body = reader.readLine();
+
                 JSONObject query = new JSONObject(body);
 
                 if (query.has("type")) {
@@ -530,36 +561,44 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
                 int id = LocalServer.playerList.get(token);
 
-                try {
-                    Tuple<Boolean, String, String> opres = game.operate(id, type == 0 ? GameOperation.turnOver : GameOperation.putCard, card);
-                    if (opres.first) {
-                        JSONObject res = new JSONObject();
-                        JSONObject data = new JSONObject();
+                if(game.getGameStatus() == OneGame.GameStatus.PLAYING || game.getGameStatus() == OneGame.GameStatus.READY) {
+                    try {
+                        Tuple<Boolean, String, String> opres = game.operate(id, type == 0 ? GameOperation.turnOver : GameOperation.putCard, card);
+                        if (!opres.first) {
+                            JSONObject res = new JSONObject();
+                            JSONObject data = new JSONObject();
 
-                        data.put("err_msg", opres.second);
+                            data.put("err_msg", opres.second);
 
-                        res.put("code", 403);
-                        res.put("data", data);
-                        res.put("msg", "非法操作");
+                            res.put("code", 403);
+                            res.put("data", data);
+                            res.put("msg", "非法操作");
 
-                        return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), res.toString());
-                    } else {
-                        JSONObject res = new JSONObject();
-                        JSONObject data = new JSONObject();
+                            return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), res.toString());
+                        } else {
+                            JSONObject res = new JSONObject();
+                            JSONObject data = new JSONObject();
 
-                        String last_code = id + " " + type + " " + opres.third;
+                            String last_code = opres.third;
 
-                        data.put("last_msg", opres.second);
-                        data.put("last_code", last_code);
+                            data.put("last_msg", opres.second);
+                            data.put("last_code", last_code);
 
-                        res.put("code", 200);
-                        res.put("data", data);
-                        res.put("msg", "操作成功");
+                            res.put("code", 200);
+                            res.put("data", data);
+                            res.put("msg", "操作成功");
 
-                        return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), res.toString());
+                            return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), res.toString());
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
                     }
-                } catch (JSONException e) {
-                    e.printStackTrace();
+                } else if(game.getGameStatus() == OneGame.GameStatus.OVER) {
+                    String msg = "{\"code\":401,\"data\":{\"err_msg\":\"对局已结束\"}, \"msg\":\"鉴权失败\"}";
+                    return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
+                } else if(game.getGameStatus() == OneGame.GameStatus.WAITING) {
+                    String msg = "{\"code\":403,\"data\":{\"err_msg\":\"人还没齐\"}, \"msg\":\"非法操作\"}";
+                    return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
                 }
             }
             return NanoHTTPD.newFixedLengthResponse(Response.Status.NOT_FOUND, getMimeType(), "{\"code\": 404, \"data\": {}, \"msg\": \"Not Found\"}");
@@ -567,7 +606,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
         @Override
         public Response get(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
-            String token = session.getHeaders().get("Authorization");
+            String token = session.getHeaders().get("authorization");
 
             /* unauthorized */
             if (token == null ||
@@ -587,7 +626,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
                 int id = LocalServer.playerList.get(token);
 
                 try {
-                    if (game.getGameStatus() == OneGame.GameStatus.PLAYING) {
+                    if (game.getGameStatus() == OneGame.GameStatus.PLAYING || game.getGameStatus() == OneGame.GameStatus.OVER) {
                         Tuple<String, String, Integer> last = game.getLast();
 
                         JSONObject res = new JSONObject();
@@ -595,13 +634,14 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
                         data.put("last_code", last.first);
                         data.put("last_msg", last.second);
-                        data.put("your_turn", last.third == game.getUserOrder(id));
 
-                        res.put("code", 200);
+                        data.put("your_turn", game.getTurn(id));
+
+                        res.put("code", game.getGameStatus() == OneGame.GameStatus.PLAYING ? 200 : 401);
                         res.put("data", data);
                         res.put("msg", "操作成功");
 
-                        return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), res.toString());
+                        return NanoHTTPD.newFixedLengthResponse(game.getGameStatus() == OneGame.GameStatus.PLAYING ? Response.Status.OK : Response.Status.UNAUTHORIZED, getMimeType(), res.toString());
                     } else if (game.getGameStatus() == OneGame.GameStatus.READY) {
                         String msg = "{\"code\":200,\"data\":{\"last_code\":\"\", \"last_msg\": \"对局刚开始\", \"your_turn\": true}, \"msg\":\"操作成功\"}";
                         return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), msg);
@@ -627,7 +667,7 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
 
         @Override
         public String getText() {
-            return "{\"code\": 404, \"msg\": \"NOt Found\"}";
+            return "{\"code\": 404, \"msg\": \"Not Found\"}";
         }
 
         @Override
@@ -647,7 +687,11 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
         setNotFoundHandler(_404Handler.class);
     }
 
-    public static String createGame(String token, boolean priv) {
+    public void addMapping(String url, Class<?> obj) {
+        addRoute(url, obj);
+    }
+
+    public static String createGame(int id, boolean priv) {
         String guuid = UUID.randomUUID().toString();
         guuid = guuid.substring(0, 8) +
                 guuid.substring(9, 13) +
@@ -657,20 +701,21 @@ public class LocalServer extends RouterNanoHTTPD implements GameServer {
         guuid = guuid.substring(0, 16).toLowerCase();
 
         OneGame game = new OneGame(cnt++, guuid, priv);
+        game.set_host(id);
         gameList.put(guuid, game);
 
         return guuid;
     }
 
-    public static String joinGame(String token, String uuid) {
+    public static String joinGame(int id, String uuid) {
         return null;
     }
 
-    public static boolean operate(String token, String uuid, GameOperation op, String card) {
+    public static boolean operate(int id, String uuid, GameOperation op, String card) {
         return true;
     }
 
-    public static String getLastOp(String token, String uuid) {
+    public static String getLastOp(int id, String uuid) {
         return null;
     }
 }
