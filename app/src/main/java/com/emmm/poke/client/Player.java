@@ -73,7 +73,7 @@ public class Player {
 
     private String token = null;
     public String uuid;
-    public int host;
+    public int host = 0;
 
     public String username;
     public String password;
@@ -82,13 +82,13 @@ public class Player {
      *            game information            *
      ******************************************/
     private final Lock lock = new ReentrantLock();
-    private final Semaphore semaphore = new Semaphore(0,true);
+    private final Semaphore semaphore = new Semaphore(0, true);
     Object ret_value = null;
 
     /******************************************
      *            game information            *
      ******************************************/
-    private OneGame_Simple game;
+    private OneGame_Simple game = null;
 
     /******************************************
      *             basic function             *
@@ -160,7 +160,7 @@ public class Player {
         }).start();
 
         semaphore.acquire();
-        return (boolean)ret_value;
+        return (boolean) ret_value;
     }
 
     public String createGame(boolean priv) throws InterruptedException {
@@ -169,8 +169,8 @@ public class Player {
             public void run() {
                 lock.lock();
                 try {
-                    if(server_game_ip == null || server_game_port == -1 || token == null){
-                        ret_value = new String();
+                    if (server_game_ip == null || server_game_port == -1 || token == null) {
+                        ret_value = null;
                     }
 
                     String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/";
@@ -189,12 +189,15 @@ public class Player {
 
                     response = client.newCall(request).execute();
 
-                    if(response.isSuccessful()) {
+                    if (response.isSuccessful()) {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
 
                         uuid = json.getJSONObject("data").getString("uuid");
                         ret_value = uuid;
+
+                        host = 0;
+                        game = new OneGame_Simple();
                     } else {
                         ret_value = null;
                     }
@@ -205,25 +208,163 @@ public class Player {
                     semaphore.release();
                 }
             }
-        }).run();
+        }).start();
 
         semaphore.acquire();
-        return (String)ret_value;
+        return (String) ret_value;
     }
 
-    public boolean joinGame(String _uuid) {
-        if(this.server_game_ip == null || this.server_game_port == -1 || this.token == null || this.uuid == null){
-            return false;
-        }
+    public boolean joinGame(String _uuid) throws InterruptedException {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                lock.lock();
+                try {
+                    if (server_game_ip == null || server_game_port == -1 || token == null || _uuid == null) {
+                        ret_value = false;
+                    }
 
-        String url = "http://" + this.server_game_ip + ":" + this.server_game_port + "/api/game/" + uuid;
+                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + _uuid;
 
+                    OkHttpClient client = new OkHttpClient();
+                    Request request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .post(new FormBody.Builder().build())
+                            .build();
+                    Response response = null;
+                    response = client.newCall(request).execute();
 
-        return false;
+                    if (response.isSuccessful()) {
+                        ret_value = true;
+                        uuid = _uuid;
+
+                        host = 1;
+                        game = new OneGame_Simple();
+                    } else {
+                        ret_value = false;
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
+                    semaphore.release();
+                }
+            }
+        }).start();
+
+        semaphore.acquire();
+        return (boolean) ret_value;
     }
 
-    public Tuple<Boolean, String, String> operate(GameOperation op, String card) {
-        return new Tuple<>(false, new String(), new String());
+    public Tuple<Boolean, String, String> operate(GameOperation op, String card) throws InterruptedException {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                lock.lock();
+                try {
+                    if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
+                        ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
+                    }
+
+                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid;
+                    String urlParam = op == GameOperation.putCard ?
+                            "{\"type\":1, \"card\":\"" + card + "\"}" :
+                            "{\"type\":0}";
+
+                    MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+                    OkHttpClient client = new OkHttpClient();
+                    RequestBody body = RequestBody.create(JSON, urlParam);
+                    Request request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .addHeader("Content-Type", "application/json")
+                            .put(body)
+                            .build();
+                    Response response = client.newCall(request).execute();
+
+                    if(response.isSuccessful() || response.code() == 403) {
+                        String res = response.body().string();
+                        JSONObject json = new JSONObject(res);
+                        JSONObject data =json.getJSONObject("data");
+
+                        String last_code = data.getString("last_code");
+                        String last_msg = data.getString("last_msg");
+
+                        if(response.isSuccessful()) game.operate(host, op, card);
+
+                        ret_value = new Tuple<Boolean, String, String>(true, last_code, last_msg);
+                    } else {
+                        ret_value = new Tuple<Boolean, String, String>(false, "请求超时", "");
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
+                    semaphore.release();
+                }
+            }
+        }).start();
+
+        semaphore.acquire();
+        return (Tuple<Boolean, String, String>) ret_value;
+    }
+
+    public boolean getLast() throws InterruptedException {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                lock.lock();
+                try {
+                    if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
+                        ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
+                    }
+
+                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid + "/last";
+
+                    OkHttpClient client = new OkHttpClient();
+                    Request request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .get()
+                            .build();
+                    Response response = client.newCall(request).execute();
+
+                    if (response.isSuccessful()) {
+                        String res = response.body().string();
+                        JSONObject json = new JSONObject(res);
+                        JSONObject data = json.getJSONObject("data");
+
+                        String last_code = data.getString("last_code");
+                        boolean your_turn = data.getBoolean("your_turn");
+
+                        String[] code = last_code.trim().split(" ");
+                        if (your_turn) {
+                            if(code[1].equals("0")) {
+                                game.operate(1, GameOperation.turnOver, code[2]);
+                            } else {
+                                game.operate(1, GameOperation.putCard, code[2]);
+                            }
+                        }
+
+                        ret_value = your_turn;
+                    } else {
+                        ret_value = false;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
+                    semaphore.release();
+                }
+            }
+        }).start();
+
+        semaphore.acquire();
+        return (boolean)ret_value;
     }
 
     public boolean isGameOver() {

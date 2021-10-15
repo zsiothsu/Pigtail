@@ -7,6 +7,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 import java.text.SimpleDateFormat;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -48,6 +50,7 @@ class OneGame {
     public int turn;
     public int winner;
 
+    Lock lock = new ReentrantLock();
 
     /* player information */
     public int host_id;
@@ -262,7 +265,17 @@ class OneGame {
     }
 
     public boolean getTurn(int id) {
-        return (this.turn == 0 ? (this.host_id == id) : (this.guest_id == id));
+        lock.lock();
+        boolean ret = false;
+        if(this.gameStatus == GameStatus.PLAYING)
+            ret =  (this.turn == 0 ? (this.host_id == id) : (this.guest_id == id));
+        else if(this.gameStatus == GameStatus.READY) {
+            this.turn = id == host_id ? 0 : 1;
+            this.gameStatus = GameStatus.PLAYING;
+            ret = true;
+        }
+        lock.unlock();
+        return ret;
     }
 }
 
@@ -422,8 +435,8 @@ public class LocalServer extends RouterNanoHTTPD {
                 res.put("msg", "操作成功");
 
 
-                server.addMapping("/api/game/" + uuid, LocalServer.GameHandler.class);
                 server.addMapping("/api/game/" + uuid + "/last", LocalServer.GameHandler.class);
+                server.addMapping("/api/game/" + uuid, LocalServer.GameHandler.class);
                 return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", res.toString());
             } catch (JSONException e) {
                 e.printStackTrace();

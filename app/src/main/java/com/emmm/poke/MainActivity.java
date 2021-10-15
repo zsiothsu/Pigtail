@@ -4,6 +4,7 @@ import android.content.res.Resources;
 import android.os.Bundle;
 
 import com.emmm.poke.client.Player;
+import com.emmm.poke.utils.GameOperation;
 import com.google.android.material.snackbar.Snackbar;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -53,20 +54,32 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
-                .detectDiskReads()
-                .detectDiskWrites()
-                .detectNetwork()
-                .penaltyLog()
-                .build());
-        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
-                .detectLeakedSqlLiteObjects()
-                .detectLeakedClosableObjects()
-                .penaltyLog()
-                .penaltyDeath()
-                .build());
+//        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
+//                .detectDiskReads()
+//                .detectDiskWrites()
+//                .detectNetwork()
+//                .penaltyLog()
+//                .build());
+//        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
+//                .detectLeakedSqlLiteObjects()
+//                .detectLeakedClosableObjects()
+//                .penaltyLog()
+//                .penaltyDeath()
+//                .build());
 
-
+        Player player = new Player("123456", "123456");
+        player.setLoginServer("127.0.0.1", 8888);
+        player.setGameServer("127.0.0.1", 8888);
+        try {
+            player.login();
+            String uuid = (String)player.createGame(false);
+            player.joinGame(uuid);
+            player.operate(GameOperation.turnOver, null);
+            player.operate(GameOperation.turnOver, null);
+            player.operate(GameOperation.turnOver, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
