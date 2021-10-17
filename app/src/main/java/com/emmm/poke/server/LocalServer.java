@@ -10,6 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -34,9 +35,9 @@ class OneGame {
      ******************************************/
     /* game status */
     private Stack<String> card_group;
-    private Stack<String> card_placement;
-    private Vector<String> card_at_p1;
-    private Vector<String> card_at_p2;
+    public Stack<String> card_placement;
+    public Vector<String> card_at_p1;
+    public Vector<String> card_at_p2;
 
     public int ID;
     public String create_at;
@@ -56,8 +57,8 @@ class OneGame {
     public int host_id;
     public int guest_id;
 
-    private Vector<String> log;
-    private Vector<String> log_msg;
+    public Vector<String> log;
+    public Vector<String> log_msg;
 
     /******************************************
      *             game operation             *
@@ -267,9 +268,9 @@ class OneGame {
     public boolean getTurn(int id) {
         lock.lock();
         boolean ret = false;
-        if(this.gameStatus == GameStatus.PLAYING)
-            ret =  (this.turn == 0 ? (this.host_id == id) : (this.guest_id == id));
-        else if(this.gameStatus == GameStatus.READY) {
+        if (this.gameStatus == GameStatus.PLAYING)
+            ret = (this.turn == 0 ? (this.host_id == id) : (this.guest_id == id));
+        else if (this.gameStatus == GameStatus.READY) {
             this.turn = id == host_id ? 0 : 1;
             this.gameStatus = GameStatus.PLAYING;
             ret = true;
@@ -282,6 +283,7 @@ class OneGame {
 public class LocalServer extends RouterNanoHTTPD {
     /* {uuid, OneGame} */
     public static HashMap<String, OneGame> gameList = new HashMap<>();
+    public static int game_pub = 0;
     /* {ID, token} */
     public static HashMap<String, Integer> playerList = new HashMap<>();
     public static int cnt = 0;
@@ -423,6 +425,7 @@ public class LocalServer extends RouterNanoHTTPD {
             }
 
             String uuid = createGame(LocalServer.playerList.get(token), pri);
+            if (!pri) LocalServer.game_pub++;
 
             JSONObject res = new JSONObject();
             JSONObject data = new JSONObject();
@@ -435,13 +438,68 @@ public class LocalServer extends RouterNanoHTTPD {
                 res.put("msg", "操作成功");
 
 
-                server.addMapping("/api/game/" + uuid + "/last", LocalServer.GameHandler.class);
+                server.addMapping("/api/game/" + uuid + "/last", LocalServer.GameControlHandler.class);
                 server.addMapping("/api/game/" + uuid, LocalServer.GameHandler.class);
                 return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", res.toString());
             } catch (JSONException e) {
                 e.printStackTrace();
                 return NanoHTTPD.newFixedLengthResponse(getStatus(), "application/json", "getText()");
             }
+        }
+
+        @Override
+        public Response get(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
+            String token = session.getHeaders().get("authorization");
+
+            /* unauthorized */
+            if (token == null ||
+                    !LocalServer.playerList.containsKey(token)) {
+                return NanoHTTPD.newFixedLengthResponse(getStatus(), getMimeType(), getText());
+            }
+
+            String baseUri = uriResource.getUri();
+            String[] uriSq = baseUri.trim().split("/");
+
+            String uuid = uriSq[2];
+
+            if (uriSq.length >= 4 && uriSq[3].equals("last") && LocalServer.gameList.containsKey(uuid)) {
+                OneGame game = LocalServer.gameList.get(uuid);
+                assert game != null;
+
+                int id = LocalServer.playerList.get(token);
+
+                try {
+                    if (game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.OVER) {
+                        Tuple<String, String, Integer> last = game.getLast();
+
+                        JSONObject res = new JSONObject();
+                        JSONObject data = new JSONObject();
+
+                        data.put("last_code", last.first);
+                        data.put("last_msg", last.second);
+
+                        data.put("your_turn", game.getTurn(id));
+
+                        res.put("code", game.getGameStatus() == GameStatus.PLAYING ? 200 : 401);
+                        res.put("data", data);
+                        res.put("msg", "操作成功");
+
+                        return NanoHTTPD.newFixedLengthResponse(game.getGameStatus() == GameStatus.PLAYING ? Response.Status.OK : Response.Status.UNAUTHORIZED, getMimeType(), res.toString());
+                    } else if (game.getGameStatus() == GameStatus.READY) {
+                        String msg = "{\"code\":200,\"data\":{\"last_code\":\"\", \"last_msg\": \"对局刚开始\", \"your_turn\": true}, \"msg\":\"操作成功\"}";
+                        return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), msg);
+                    } else if (game.getGameStatus() == GameStatus.WAITING) {
+                        String msg = "{\"code\":403,\"data\":{\"err_msg\":\"人还没齐\"}, \"msg\":\"非法操作\"}";
+                        return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                return NanoHTTPD.newChunkedResponse(getStatus(), getMimeType(), getData());
+            }
+
+            return NanoHTTPD.newChunkedResponse(getStatus(), getMimeType(), getData());
         }
     }
 
@@ -560,7 +618,7 @@ public class LocalServer extends RouterNanoHTTPD {
 
                 int id = LocalServer.playerList.get(token);
 
-                if(game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.READY) {
+                if (game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.READY) {
                     try {
                         Tuple<Boolean, String, String> opres = game.operate(id, type == 0 ? GameOperation.turnOver : GameOperation.putCard, card);
                         if (!opres.first) {
@@ -580,8 +638,8 @@ public class LocalServer extends RouterNanoHTTPD {
 
                             String last_code = opres.third;
 
-                            data.put("last_msg", opres.second);
-                            data.put("last_code", last_code);
+                            data.put("last_code", opres.second);
+                            data.put("last_msg", last_code);
 
                             res.put("code", 200);
                             res.put("data", data);
@@ -592,10 +650,10 @@ public class LocalServer extends RouterNanoHTTPD {
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
-                } else if(game.getGameStatus() == GameStatus.OVER) {
+                } else if (game.getGameStatus() == GameStatus.OVER) {
                     String msg = "{\"code\":401,\"data\":{\"err_msg\":\"对局已结束\"}, \"msg\":\"鉴权失败\"}";
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
-                } else if(game.getGameStatus() == GameStatus.WAITING) {
+                } else if (game.getGameStatus() == GameStatus.WAITING) {
                     String msg = "{\"code\":403,\"data\":{\"err_msg\":\"人还没齐\"}, \"msg\":\"非法操作\"}";
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
                 }
@@ -618,41 +676,148 @@ public class LocalServer extends RouterNanoHTTPD {
 
             String uuid = uriSq[2];
 
-            if (uriSq.length >= 4 && uriSq[3].equals("last") && LocalServer.gameList.containsKey(uuid)) {
+            if (LocalServer.gameList.containsKey(uuid)) {
                 OneGame game = LocalServer.gameList.get(uuid);
                 assert game != null;
 
                 int id = LocalServer.playerList.get(token);
 
                 try {
-                    if (game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.OVER) {
+                    if (game.getGameStatus() == GameStatus.OVER) {
                         Tuple<String, String, Integer> last = game.getLast();
 
                         JSONObject res = new JSONObject();
                         JSONObject data = new JSONObject();
 
-                        data.put("last_code", last.first);
-                        data.put("last_msg", last.second);
+                        StringBuilder host_hand = new StringBuilder();
+                        StringBuilder client_hand = new StringBuilder();
+                        StringBuilder card_placement = new StringBuilder();
 
-                        data.put("your_turn", game.getTurn(id));
+                        for (String i : game.card_at_p1) {
+                            host_hand.append(i).append(",");
+                        }
+                        for (String i : game.card_at_p2) {
+                            client_hand.append(i).append(",");
+                        }
+                        for (String i : game.card_placement) {
+                            card_placement.append(i).append(",");
+                        }
+                        host_hand.deleteCharAt(host_hand.length() - 1);
+                        client_hand.deleteCharAt(client_hand.length() - 1);
+                        card_placement.deleteCharAt(card_placement.length() - 1);
 
-                        res.put("code", game.getGameStatus() == GameStatus.PLAYING ? 200 : 401);
+                        data.put("ID", game.ID)
+                                .put("CreatedAt", game.create_at)
+                                .put("UpdatedAt", game.updated_at)
+                                .put("DeletedAt", null)
+                                .put("uuid", uuid)
+                                .put("host_id", game.host_id)
+                                .put("client_id", game.guest_id)
+                                .put("host_hand", host_hand.toString())
+                                .put("client_hand", client_hand.toString())
+                                .put("turn", game.turn)
+                                .put("card_group", "")
+                                .put("card_placement", card_placement.toString())
+                                .put("private", game.private_status)
+                                .put("finished", true)
+                                .put("top", game.card_placement.empty() ? "nil" : game.card_placement.peek())
+                                .put("last", game.log.lastElement())
+                                .put("winner", game.winner);
+
+                        res.put("code", 200);
                         res.put("data", data);
                         res.put("msg", "操作成功");
 
                         return NanoHTTPD.newFixedLengthResponse(game.getGameStatus() == GameStatus.PLAYING ? Response.Status.OK : Response.Status.UNAUTHORIZED, getMimeType(), res.toString());
-                    } else if (game.getGameStatus() == GameStatus.READY) {
-                        String msg = "{\"code\":200,\"data\":{\"last_code\":\"\", \"last_msg\": \"对局刚开始\", \"your_turn\": true}, \"msg\":\"操作成功\"}";
-                        return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), msg);
-                    } else if (game.getGameStatus() == GameStatus.WAITING) {
-                        String msg = "{\"code\":403,\"data\":{\"err_msg\":\"人还没齐\"}, \"msg\":\"非法操作\"}";
-                        return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
 
                 return NanoHTTPD.newChunkedResponse(getStatus(), getMimeType(), getData());
+            }
+
+            return NanoHTTPD.newChunkedResponse(getStatus(), getMimeType(), getData());
+        }
+    }
+
+    public static class indexHandler extends DefaultHandler {
+
+        @Override
+        public String getText() {
+            return "{\"code\":401,\"data\":{},\"msg\":\"鉴权失败\"}";
+        }
+
+        @Override
+        public String getMimeType() {
+            return "application/json";
+        }
+
+        @Override
+        public Response.IStatus getStatus() {
+            return Response.Status.UNAUTHORIZED;
+        }
+
+        @Override
+        public Response get(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
+            String token = session.getHeaders().get("authorization");
+
+            /* unauthorized */
+            if (token == null ||
+                    !LocalServer.playerList.containsKey(token)) {
+                return NanoHTTPD.newFixedLengthResponse(getStatus(), getMimeType(), getText());
+            }
+
+            int page_size = Integer.parseInt(Objects.requireNonNull(urlParams.get("page_size")));
+            int page_num = Integer.parseInt(Objects.requireNonNull(urlParams.get("page_num")));
+
+            if (page_num <= 0 || page_size * (page_num - 1) > game_pub - 1) page_num = 1;
+            if (page_size <= 0) page_size = game_pub;
+
+            int cnt = 0;
+            int begin = page_size * (page_num - 1);
+
+            JSONObject json = new JSONObject();
+            JSONObject data = new JSONObject();
+
+            JSONArray games = new JSONArray();
+
+            //TODO
+            for (Map.Entry<String, OneGame> game_entry : LocalServer.gameList.entrySet()) {
+                String uuid = game_entry.getKey();
+                OneGame game = game_entry.getValue();
+
+                if (game.private_status = true) continue;
+
+                if (cnt >= begin && cnt < begin + page_size) {
+                    JSONObject new_game = new JSONObject();
+
+                    try {
+                        new_game.put("uuid", uuid)
+                                .put("host_id", game.host_id)
+                                .put("client_id", game.guest_id)
+                                .put("created_at", game.create_at);
+                        games.put(new_game);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                cnt++;
+            }
+
+            if (cnt == 0) games = null;
+
+            try {
+                data.put("games", games)
+                        .put("total", LocalServer.game_pub)
+                        .put("total_page_num", game_pub / page_size);
+                json.put("code", 200)
+                        .put("data", data)
+                        .put("msg", "操作成功");
+                return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), json.toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
 
             return NanoHTTPD.newChunkedResponse(getStatus(), getMimeType(), getData());
@@ -678,11 +843,13 @@ public class LocalServer extends RouterNanoHTTPD {
         public Response.IStatus getStatus() {
             return Response.Status.NOT_FOUND;
         }
+
     }
 
     public void addMappings() {
-        addRoute("/api/user/login/", LoginHandler.class, this);
-        addRoute("/api/game/", GameControlHandler.class, this);
+        addRoute("/api/user/login/", LoginHandler.class);
+        addRoute("/api/game/", GameControlHandler.class);
+        addRoute("/api/game/index/", indexHandler.class);
         setNotFoundHandler(_404Handler.class);
     }
 

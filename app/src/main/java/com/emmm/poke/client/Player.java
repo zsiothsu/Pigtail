@@ -10,6 +10,8 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.concurrent.Semaphore;
@@ -40,6 +42,12 @@ class OneGame_Simple {
     public int own_C;
     public int own_D;
 
+    public int winner;
+    public boolean finished;
+
+    public Vector<String> log;
+    public Vector<String> log_msg;
+
     public OneGame_Simple() {
         this.card_placement = new Stack<>();
         this.card_at_p1 = new Vector<>();
@@ -55,10 +63,142 @@ class OneGame_Simple {
         this.own_H = 0;
         this.own_C = 0;
         this.own_D = 0;
+
+
+
+        log = new Vector<String>();
+        log_msg = new Vector<String>();
     }
 
     public Tuple<Boolean, String, String> operate(int host, GameOperation op, String card) {
-        return new Tuple<Boolean, String, String>(false, new String(), new String());
+        String id_string = host == 0 ? "P1" : "P2";
+        String op_string = op == GameOperation.turnOver ? "从\u003c牌库\u003e翻开了一张" : "从\u003c手牌\u003e打出了一张";
+        String res = null;
+
+        if (op == GameOperation.turnOver) {
+            String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
+            card_group -= 1;
+            this.card_placement.push(card);
+
+            char type = card.charAt(0);
+            switch (type) {
+                case 'S':
+                    rest_S--;
+                    break;
+                case 'H':
+                    rest_H--;
+                    break;
+                case 'C':
+                    rest_C--;
+                    break;
+                case 'D':
+                    rest_D--;
+                    break;
+            }
+
+            if (!(old_top == null) && old_top.charAt(0) == type) {
+                Vector<String> player_card_group = host == 0 ? this.card_at_p1 : this.card_at_p2;
+
+                while (!this.card_placement.empty()) {
+                    String top_card = this.card_placement.pop();
+                    player_card_group.add(top_card);
+
+                    if(host == 0) {
+                        char ctype = top_card.charAt(0);
+                        switch (ctype) {
+                            case 'S':
+                                own_S++;
+                                break;
+                            case 'H':
+                                own_H++;
+                                break;
+                            case 'C':
+                                own_C++;
+                                break;
+                            case 'D':
+                                own_D++;
+                                break;
+                        }
+                    }
+                }
+
+                res = " 并拿走了\u003c放置区\u003e的卡牌";
+            }
+
+            if (this.card_group <= 0) {
+                if (this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 0;
+                else if (this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 1;
+                else this.winner = -1;
+                this.finished = true;
+            }
+
+            String code = host + " 0 " + card;
+            String msg = id_string + " " + op_string + " " + card;
+            if (res != null) msg += res;
+
+            this.log.add(code);
+            this.log_msg.add(msg);
+
+
+            return new Tuple<Boolean, String, String>(true, code, msg);
+        } else {
+            String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
+            Vector<String> player_card_group = host == 0 ? this.card_at_p1 : this.card_at_p2;
+
+            this.card_placement.push(card);
+
+            char type = card.charAt(0);
+            switch (type) {
+                case 'S':
+                    own_S--;
+                    break;
+                case 'H':
+                    own_H--;
+                    break;
+                case 'C':
+                    own_C--;
+                    break;
+                case 'D':
+                    own_D--;
+                    break;
+            }
+
+            if (!(old_top == null) && old_top.charAt(0) == card.charAt(0)) {
+                while (!this.card_placement.empty()) {
+                    String top_card = this.card_placement.pop();
+                    player_card_group.add(top_card);
+
+                    if(host == 0) {
+                        char ctype = top_card.charAt(0);
+                        switch (ctype) {
+                            case 'S':
+                                own_S++;
+                                break;
+                            case 'H':
+                                own_H++;
+                                break;
+                            case 'C':
+                                own_C++;
+                                break;
+                            case 'D':
+                                own_D++;
+                                break;
+                        }
+                    }
+                }
+                res = " 并拿走了\u003c放置区\u003e的卡牌";
+            }
+
+            id_string = host == 0 ? "P1" : "P2";
+
+            String code = host + " 0 " + card;
+            String msg = id_string + " " + op_string + " " + card;
+            if (res != null) msg += res;
+
+            this.log_msg.add(msg);
+
+            return new Tuple<Boolean, String, String>(true, code, msg);
+        }
     }
 }
 
@@ -285,15 +425,13 @@ public class Player {
                             .build();
                     Response response = client.newCall(request).execute();
 
-                    if(response.isSuccessful() || response.code() == 403) {
+                    if (response.isSuccessful() || response.code() == 403) {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
-                        JSONObject data =json.getJSONObject("data");
+                        JSONObject data = json.getJSONObject("data");
 
                         String last_code = data.getString("last_code");
                         String last_msg = data.getString("last_msg");
-
-                        if(response.isSuccessful()) game.operate(host, op, card);
 
                         ret_value = new Tuple<Boolean, String, String>(true, last_code, last_msg);
                     } else {
@@ -342,11 +480,12 @@ public class Player {
                         boolean your_turn = data.getBoolean("your_turn");
 
                         String[] code = last_code.trim().split(" ");
-                        if (your_turn) {
-                            if(code[1].equals("0")) {
-                                game.operate(1, GameOperation.turnOver, code[2]);
+                        if (last_code.length() != 0 && your_turn && (game.log.isEmpty() || (!game.log.isEmpty() && !game.log.lastElement().equals(last_code)))) {
+                            game.log.add(last_code);
+                            if (code[1].equals("0")) {
+                                game.operate(Integer.parseInt(code[0]), GameOperation.turnOver, code[2]);
                             } else {
-                                game.operate(1, GameOperation.putCard, code[2]);
+                                game.operate(Integer.parseInt(code[0]), GameOperation.putCard, code[2]);
                             }
                         }
 
@@ -364,14 +503,17 @@ public class Player {
         }).start();
 
         semaphore.acquire();
-        return (boolean)ret_value;
+        return (boolean) ret_value;
     }
 
     public boolean isGameOver() {
-        return false;
+        return game.finished;
     }
 
-    public boolean isWinner() {
+    public boolean winner() {
+        if(isGameOver()){
+            return this.host == game.winner;
+        }
         return false;
     }
 }

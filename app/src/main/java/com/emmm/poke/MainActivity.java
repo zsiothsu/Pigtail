@@ -74,9 +74,13 @@ public class MainActivity extends AppCompatActivity {
             player.login();
             String uuid = (String)player.createGame(false);
             player.joinGame(uuid);
+            player.getLast();
             player.operate(GameOperation.turnOver, null);
+            player.getLast();
             player.operate(GameOperation.turnOver, null);
+            player.getLast();
             player.operate(GameOperation.turnOver, null);
+            player.getLast();
         } catch (Exception e) {
             e.printStackTrace();
         }
