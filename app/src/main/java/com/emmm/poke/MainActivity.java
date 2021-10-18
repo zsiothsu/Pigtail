@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
     public static LocalServer s = LocalServer.server;
-
+    public volatile static boolean p1 = false, p2 = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,20 +70,60 @@ public class MainActivity extends AppCompatActivity {
         Player player = new Player("123456", "123456");
         player.setLoginServer("127.0.0.1", 8888);
         player.setGameServer("127.0.0.1", 8888);
+        Player player2 = new Player("123456", "123456");
+        player2.setLoginServer("127.0.0.1", 8888);
+        player2.setGameServer("127.0.0.1", 8888);
+
+        boolean p1 = false, p2 = false;
+
         try {
             player.login();
-            String uuid = (String)player.createGame(false);
-            player.joinGame(uuid);
-            player.getLast();
-            player.operate(GameOperation.turnOver, null);
-            player.getLast();
-            player.operate(GameOperation.turnOver, null);
-            player.getLast();
-            player.operate(GameOperation.turnOver, null);
-            player.getLast();
-        } catch (Exception e) {
+            player2.login();
+            String uuid = player.createGame(false);
+            player2.joinGame(uuid);
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        while (!player.getLast()) {
+                            Thread.sleep(50);
+                        }
+                        player.ai.active();
+                        if(player.isGameOver()) break;
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                MainActivity.p1 = true;
+            }
+        }).start();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        while (!player2.getLast()) {
+                            Thread.sleep(50);
+                        }
+                        player2.ai.active();
+                        Thread.sleep(50);
+                        if(player2.isGameOver()) break;
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                MainActivity.p2 = true;
+            }
+        }).start();
+
+        while (!(player.isGameOver() && player2.isGameOver()));
+        System.out.println("OK");
     }
 
     @Override

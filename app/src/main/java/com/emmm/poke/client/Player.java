@@ -35,15 +35,15 @@ class OneGame_Simple {
     public int rest_C;
     public int rest_D;
 
-    private Vector<String> card_at_p1;
-    private Vector<String> card_at_p2;
+    public Vector<String> card_at_p1;
+    public Vector<String> card_at_p2;
     public int own_S;
     public int own_H;
     public int own_C;
     public int own_D;
 
-    public int winner;
-    public boolean finished;
+    public int winner = -1;
+    public boolean finished = false;
 
     public Vector<String> log;
     public Vector<String> log_msg;
@@ -64,13 +64,18 @@ class OneGame_Simple {
         this.own_C = 0;
         this.own_D = 0;
 
-
+        this.finished = false;
+        this.winner = -1;
 
         log = new Vector<String>();
         log_msg = new Vector<String>();
     }
 
     public Tuple<Boolean, String, String> operate(int host, GameOperation op, String card) {
+        if(this.card_group <= 0) {
+            return new  Tuple<Boolean, String, String>(false, new String(), new String());
+        }
+
         String id_string = host == 0 ? "P1" : "P2";
         String op_string = op == GameOperation.turnOver ? "从\u003c牌库\u003e翻开了一张" : "从\u003c手牌\u003e打出了一张";
         String res = null;
@@ -218,6 +223,7 @@ public class Player {
     public String username;
     public String password;
 
+    public AI ai;
     /******************************************
      *            game information            *
      ******************************************/
@@ -228,7 +234,7 @@ public class Player {
     /******************************************
      *            game information            *
      ******************************************/
-    private OneGame_Simple game = null;
+    public OneGame_Simple game = null;
 
     /******************************************
      *             basic function             *
@@ -236,6 +242,7 @@ public class Player {
     public Player(String username, String password) {
         this.username = username;
         this.password = password;
+        this.ai = new AI(this);
     }
 
     public void setLoginServer(String ip, int port) {
@@ -434,6 +441,7 @@ public class Player {
                         String last_msg = data.getString("last_msg");
 
                         ret_value = new Tuple<Boolean, String, String>(true, last_code, last_msg);
+//                        game.operate(host, op, card);
                     } else {
                         ret_value = new Tuple<Boolean, String, String>(false, "请求超时", "");
                     }
@@ -471,7 +479,7 @@ public class Player {
                             .build();
                     Response response = client.newCall(request).execute();
 
-                    if (response.isSuccessful()) {
+                    if (response.isSuccessful() || response.code() == 401) {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
                         JSONObject data = json.getJSONObject("data");
@@ -480,8 +488,8 @@ public class Player {
                         boolean your_turn = data.getBoolean("your_turn");
 
                         String[] code = last_code.trim().split(" ");
-                        if (last_code.length() != 0 && your_turn && (game.log.isEmpty() || (!game.log.isEmpty() && !game.log.lastElement().equals(last_code)))) {
-                            game.log.add(last_code);
+                        //TODO: 判断
+                        if (last_code.length() != 0 && (game.log.isEmpty() || (!game.log.isEmpty() && !game.log.lastElement().equals(last_code)))) {
                             if (code[1].equals("0")) {
                                 game.operate(Integer.parseInt(code[0]), GameOperation.turnOver, code[2]);
                             } else {
@@ -506,8 +514,16 @@ public class Player {
         return (boolean) ret_value;
     }
 
+    public Tuple<Boolean, String, String> operate_update(GameOperation op, String card) throws InterruptedException {
+        Tuple<Boolean, String, String> ret = operate(op, card);
+        Thread.sleep(1);
+        getLast();
+        Thread.sleep(1);
+        return ret;
+    }
+
     public boolean isGameOver() {
-        return game.finished;
+        return this.game.finished;
     }
 
     public boolean winner() {
