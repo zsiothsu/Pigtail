@@ -1,7 +1,14 @@
+/**
+ * TokenEncrypt
+ *
+ * Generate token while user login
+ * @see <a href="https://blog.csdn.net/p812438109/article/details/86677329"></a>
+ */
+
 package com.emmm.poke.server;
 
 public class TokenEncrypt {
-    private static final String ENCODED_PASSWORD = "h78o4nc48p38y";
+    private static final String ENCODED_PASSWORD = "f676fw&^(*@QE(Hnb*(^D)";
 
     public static String encode(String str) {
         return strToHex(encodedString(str, ENCODED_PASSWORD));

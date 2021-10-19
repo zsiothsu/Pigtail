@@ -1,3 +1,13 @@
+/**
+ * LocalServer
+ *
+ * Including definitions of game server.
+ * It has the same API with remote server that SE course
+ * applied. Not only served for single player mode but
+ * also multi-player mode if game on another device connected
+ * to this server by ip address.
+ */
+
 package com.emmm.poke.server;
 
 import android.annotation.SuppressLint;
@@ -19,10 +29,19 @@ import com.emmm.poke.utils.*;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.router.*;
 
+/**
+ * OneGame:
+ * A class implements game PigTail, including operation, log
+ * and automatic sequence management.
+ */
 class OneGame {
     /******************************************
      *            const variable              *
      ******************************************/
+    /**
+     * card_new
+     * a enumeration of all cards for initializing of card group
+     */
     public static final String[] card_new = {
             "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "SJ", "SQ", "SK",
             "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "HJ", "HQ", "HK",
@@ -33,12 +52,21 @@ class OneGame {
     /******************************************
      *            game information            *
      ******************************************/
-    /* game status */
+    /* cards */
     private Stack<String> card_group;
     public Stack<String> card_placement;
     public Vector<String> card_at_p1;
     public Vector<String> card_at_p2;
 
+    /* game status information */
+    public GameStatus gameStatus;
+    public int turn;
+    public int winner;
+
+    /******************************************
+     *      game controlling information      *
+     ******************************************/
+    /* game controlling information*/
     public int ID;
     public String create_at;
     public String updated_at;
@@ -47,22 +75,32 @@ class OneGame {
     public boolean private_status;
     public boolean finished;
 
-    public GameStatus gameStatus;
-    public int turn;
-    public int winner;
-
-    Lock lock = new ReentrantLock();
-
     /* player information */
     public int host_id;
     public int guest_id;
 
+    /**
+     * lock
+     * reentrant lock for multithreaded query,
+     * for ensuring only one player getting the
+     * first hand
+     */
+    Lock turn_lock = new ReentrantLock();
+
+    /* logs */
     public Vector<String> log;
     public Vector<String> log_msg;
 
     /******************************************
      *             game operation             *
      ******************************************/
+    /**
+     * create a game instant.
+     *
+     * @param ID             game ID, managed by server
+     * @param uuid           game uuid
+     * @param private_status if set private, the game will not be shown on game list
+     */
     public OneGame(int ID, String uuid, boolean private_status) {
         @SuppressLint("SimpleDateFormat")
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -78,6 +116,7 @@ class OneGame {
         this.private_status = private_status;
         this.finished = false;
 
+        /* turn will be changed after first operation */
         this.turn = 0;
         this.winner = -1;
 
@@ -110,29 +149,34 @@ class OneGame {
     }
 
     /**
-     * @param host_id: id of game host player
-     * @apiNote set host of this game
+     * set host of this game
+     *
+     * @param host_id host player id on server
      */
     public void set_host(int host_id) {
         this.host_id = host_id;
     }
 
     /**
-     * @param guest_id: id of guest player
-     * @apiNote set guest of this game
+     * set guest of this game
+     *
+     * @param guest_id: guest player id on server
      */
     public void add_guest(int guest_id) {
         this.guest_id = guest_id;
+        /* reached two players, game is ready */
         this.gameStatus = GameStatus.READY;
     }
 
     /**
-     * @param player_id: player id, NOT the id of host/guest
-     * @param op:        game operation
-     * @param card:      if op equals GameOperation.putCard, card must be non-null
+     * do an operation: put a card or turn over from card group
+     *
+     * @param player_id player id, NOT the id of host/guest
+     * @param op        game operation
+     * @param card      if op equals GameOperation.putCard, card must be non-null
      * @return Tuple.first: isSuccess
-     * Tuple.second: full message
-     * Tuple.third: operated card
+     * Tuple.second: code likes '0 0 H7'
+     * Tuple.third: full log message
      */
     public Tuple<Boolean, String, String> operate(int player_id, GameOperation op, String card) {
         if (this.gameStatus == GameStatus.WAITING) {
@@ -141,8 +185,10 @@ class OneGame {
             return new Tuple<Boolean, String, String>(false, "对局已结束", new String());
         }
 
+        /* backup turn for rollback */
         int turn_bak = turn;
 
+        /* block player not with this turn */
         if (this.gameStatus == GameStatus.PLAYING) {
             if (!(turn == 0 ? (host_id == player_id) : (guest_id == player_id))) {
                 return new Tuple<Boolean, String, String>(false, "还不是你的回合", new String());
@@ -159,9 +205,14 @@ class OneGame {
             String new_card = this.card_group.pop();
             String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
 
+            /* turn over from  card group */
             card = new_card;
             this.card_placement.push(new_card);
 
+            /*
+              if types of new card and card on old top is the same,
+              move all cards to player
+             */
             if (!(old_top == null) && old_top.charAt(0) == new_card.charAt(0)) {
                 Vector<String> player_card_group = turn == 0 ? this.card_at_p1 : this.card_at_p2;
 
@@ -172,23 +223,27 @@ class OneGame {
                 res = " 并拿走了\u003c放置区\u003e的卡牌";
             }
 
+            /* game comes to end */
             if (this.card_group.empty()) {
                 this.gameStatus = GameStatus.OVER;
 
                 if (this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 0;
                 else if (this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 1;
-                else this.winner = -1;
+                else this.winner = -1; // no winner
 
                 this.finished = true;
             }
 
             if (this.gameStatus == GameStatus.READY) {
+                /* set turn for first hand player */
                 this.turn = player_id == host_id ? 1 : 0;
+                /* game start after first operation */
                 this.gameStatus = GameStatus.PLAYING;
             } else {
                 this.turn = (this.turn + 1) % 2;
             }
 
+            /* logger */
             id = (this.turn + 1) % 2;
             id_string = id == 0 ? "P1" : "P2";
 
@@ -198,7 +253,6 @@ class OneGame {
 
             this.log.add(code);
             this.log_msg.add(msg);
-
 
             this.updated_at = formatter.format(new Date()).trim();
             String[] timestr = this.updated_at.split(" ");
@@ -209,13 +263,19 @@ class OneGame {
             String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
             Vector<String> player_card_group = turn == 0 ? this.card_at_p1 : this.card_at_p2;
 
+            /* error operation */
             if (card == null || !player_card_group.contains(card)) {
                 this.gameStatus = GameStatus.READY;
                 this.turn = turn_bak;
                 return new Tuple<Boolean, String, String>(false, "非法操作", new String());
             }
+
             this.card_placement.push(card);
 
+            /*
+              if types of new card and card on old top is the same,
+              move all cards to player
+             */
             if (!(old_top == null) && old_top.charAt(0) == card.charAt(0)) {
                 while (!this.card_placement.empty()) {
                     player_card_group.add(this.card_placement.pop());
@@ -223,6 +283,7 @@ class OneGame {
                 res = " 并拿走了\u003c放置区\u003e的卡牌";
             }
 
+            /* set turn for first hand player */
             if (this.gameStatus == GameStatus.READY) {
                 this.turn = player_id == host_id ? 1 : 0;
                 this.gameStatus = GameStatus.PLAYING;
@@ -230,6 +291,7 @@ class OneGame {
                 this.turn = (this.turn + 1) % 2;
             }
 
+            /* logger */
             id = (this.turn + 1) % 2;
             id_string = id == 0 ? "P1" : "P2";
 
@@ -248,14 +310,32 @@ class OneGame {
         }
     }
 
+    /**
+     * get game status
+     *
+     * @return GameStatus, PLAYING, READY, WAITING or OVER
+     */
     public GameStatus getGameStatus() {
         return this.gameStatus;
     }
 
+    /**
+     * judge whether specific player is host
+     *
+     * @param id player id
+     * @return order 0: host  1: guest
+     */
     public int getUserOrder(int id) {
         return id == host_id ? 0 : 1;
     }
 
+    /**
+     * get last operation code
+     *
+     * @return Tuple.first: last code
+     * Tuple.second: last log message
+     * Tuple.third: turn now
+     */
     public Tuple<String, String, Integer> getLast() {
         /* <log, log_msg, turn now> */
         if (this.updated_at != null) {
@@ -265,37 +345,63 @@ class OneGame {
         return new Tuple<String, String, Integer>(new String(), new String(), 0);
     }
 
+    /**
+     * get turn of player, and it will set turn for first hand player
+     *
+     * @param id player id
+     * @return true: is turn of player
+     * false: is not player's turn
+     */
     public boolean getTurn(int id) {
-        lock.lock();
+        turn_lock.lock();
         boolean ret = false;
         if (this.gameStatus == GameStatus.PLAYING)
             ret = (this.turn == 0 ? (this.host_id == id) : (this.guest_id == id));
         else if (this.gameStatus == GameStatus.READY) {
+            /* if player is first hand, set turn for this player */
             this.turn = id == host_id ? 0 : 1;
             this.gameStatus = GameStatus.PLAYING;
             ret = true;
         }
-        lock.unlock();
+        turn_lock.unlock();
         return ret;
     }
 }
 
+/** Localserver
+ * Game server of PigTail. It has the same api of remote server SE
+ * class offered. Local server will be started while APP creating.
+ * Served not only for single player mode, but also multi-player
+ * games. Player can connect to this server by ip address.
+ *
+ * @see fi.iki.elonen.NanoHTTPD
+ */
 public class LocalServer extends RouterNanoHTTPD {
-    /* {uuid, OneGame} */
+    /*
+       Game list stored in server, game will be shown on game list
+       if its not set private.
+    */
     public static HashMap<String, OneGame> gameList = new HashMap<>();
-    public static int game_pub = 0;
-    /* {ID, token} */
+    public static int game_public = 0;
+
+    /* player list */
     public static HashMap<String, Integer> playerList = new HashMap<>();
     public static int cnt = 0;
     public static int cnt_player = 0;
 
-    public static LocalServer server = new LocalServer(8888);
+    /* global server instance */
+    public static LocalServer server = new LocalServer(9000);
 
+    /**
+     * Create a server
+     * @param port server port
+     */
     public LocalServer(int port) {
         super(port);
         cnt = 0;
         cnt_player = 1;
 
+        /* add route for different uri */
         addMappings();
 
         try {
@@ -305,6 +411,9 @@ public class LocalServer extends RouterNanoHTTPD {
         }
     }
 
+    /** LoginHandler
+     * Handler for api "/api/user/login/"
+     */
     public static class LoginHandler extends DefaultHandler {
         public LoginHandler() {
             super();
@@ -325,6 +434,10 @@ public class LocalServer extends RouterNanoHTTPD {
             return Response.Status.BAD_REQUEST;
         }
 
+        /**
+         * Handler for POST method
+         * User login
+         */
         @Override
         public Response post(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
             HashMap<String, String> map = new HashMap<>();
@@ -342,12 +455,20 @@ public class LocalServer extends RouterNanoHTTPD {
             student_id = session.getParameters().get("student_id").get(0);
             password = session.getParameters().get("password").get(0);
 
-            /* param error */
+            /* parameter error */
             if (student_id == null || password == null) {
-                return NanoHTTPD.newFixedLengthResponse(getStatus(), getMimeType(), "{\"student\":\"" + student_id + "\",\"pa\":\"" + password + "\",\"full\":\"" + password + "\"}");
+                return NanoHTTPD.newFixedLengthResponse(getStatus(), getMimeType(), getText());
             }
 
-            String token = TokenEncrypt.encode(student_id + (new Date().getTime()) + password);
+            /* generate token for user */
+            Random ran = new Random(new Date().getTime());
+
+            String token1 = TokenEncrypt.encode(student_id);
+            String token2 = TokenEncrypt.encode(password);
+            String token3 = TokenEncrypt.encode(String.valueOf(new Date().getTime()));
+            String token4 = TokenEncrypt.encode(String.valueOf(ran.nextInt()));
+            String token5 = TokenEncrypt.encode(String.valueOf(ran.nextInt()));
+            String token = token1 + token2 + "." + token3 + token4 + "_" + token5 ;
             LocalServer.playerList.put(token, LocalServer.cnt_player++);
 
             JSONObject res = new JSONObject();
@@ -374,6 +495,10 @@ public class LocalServer extends RouterNanoHTTPD {
         }
     }
 
+    /** GameControlHandler
+     * Including create a new game and get last operation.
+     * For api "/api/game/"
+     */
     public static class GameControlHandler extends DefaultHandler {
         public GameControlHandler() {
             super();
@@ -394,6 +519,11 @@ public class LocalServer extends RouterNanoHTTPD {
             return Response.Status.UNAUTHORIZED;
         }
 
+        /**
+         * Handler for POST method
+         * Create a new game
+         * @see <a href="https://www.showdoc.com.cn/1605811132048301/7630672720835211"></a>
+         */
         @Override
         public Response post(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
             String token = session.getHeaders().get("authorization");
@@ -406,6 +536,7 @@ public class LocalServer extends RouterNanoHTTPD {
 
             boolean pri = false;
 
+            /* parse private status from parameter*/
             try {
                 HashMap<String, String> map = new HashMap<>();
                 session.parseBody(map);
@@ -424,8 +555,9 @@ public class LocalServer extends RouterNanoHTTPD {
                 /* nothing to be done */
             }
 
+            /* create a new game */
             String uuid = createGame(LocalServer.playerList.get(token), pri);
-            if (!pri) LocalServer.game_pub++;
+            if (!pri) LocalServer.game_public++;
 
             JSONObject res = new JSONObject();
             JSONObject data = new JSONObject();
@@ -437,7 +569,7 @@ public class LocalServer extends RouterNanoHTTPD {
                 res.put("code", 200);
                 res.put("msg", "操作成功");
 
-
+                /* add route for new game */
                 server.addMapping("/api/game/" + uuid + "/last", LocalServer.GameControlHandler.class);
                 server.addMapping("/api/game/" + uuid, LocalServer.GameHandler.class);
                 return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", res.toString());
@@ -447,6 +579,11 @@ public class LocalServer extends RouterNanoHTTPD {
             }
         }
 
+        /**
+         * Handler for GET method
+         * Get last status for specific game
+         * @see <a href="https://www.showdoc.com.cn/1605811132048301/7630674486176687"></a>
+         */
         @Override
         public Response get(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
             String token = session.getHeaders().get("authorization");
@@ -466,6 +603,7 @@ public class LocalServer extends RouterNanoHTTPD {
                 OneGame game = LocalServer.gameList.get(uuid);
                 assert game != null;
 
+                /* get user id, for judging whether is the turn of player*/
                 int id = LocalServer.playerList.get(token);
 
                 try {
@@ -480,6 +618,11 @@ public class LocalServer extends RouterNanoHTTPD {
 
                         data.put("your_turn", game.getTurn(id));
 
+                        /*
+                           return
+                           200/OK for PLAYING
+                           401/UNAUTHORIZED for OVER
+                         */
                         res.put("code", game.getGameStatus() == GameStatus.PLAYING ? 200 : 401);
                         res.put("data", data);
                         res.put("msg", "操作成功");
@@ -503,6 +646,10 @@ public class LocalServer extends RouterNanoHTTPD {
         }
     }
 
+    /** GameHandler
+     * Game process handler
+     * Handler for api "/api/game/:uuid"
+     */
     public static class GameHandler extends DefaultHandler {
         public GameHandler() {
             super();
@@ -523,6 +670,11 @@ public class LocalServer extends RouterNanoHTTPD {
             return Response.Status.UNAUTHORIZED;
         }
 
+        /**
+         * Handler for POST method
+         * Join a game created
+         * @see <a href="https://www.showdoc.com.cn/1605811132048301/7630673091659110"></a>
+         */
         @Override
         public Response post(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
             String token = session.getHeaders().get("authorization");
@@ -547,6 +699,7 @@ public class LocalServer extends RouterNanoHTTPD {
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), "{\"code\":403,\"data\":{\"err_msg\":\"队伍已满\"},\"msg\":\"非法操作\"}");
                 }
 
+                /* set player as guest on specific game */
                 game.add_guest(LocalServer.playerList.get(token));
 
                 JSONObject res = new JSONObject();
@@ -565,6 +718,11 @@ public class LocalServer extends RouterNanoHTTPD {
             return NanoHTTPD.newFixedLengthResponse(Response.Status.NOT_FOUND, getMimeType(), "{\"code\": 404, \"data\": {}, \"msg\": \"Not Found\"}");
         }
 
+        /**
+         * Handler for PUT method
+         * game operation: put a card or turn over from card group
+         * @see <a href="https://www.showdoc.com.cn/1605811132048301/7630673637380927"></a>
+         */
         @Override
         public Response put(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
             String token = session.getHeaders().get("authorization");
@@ -583,6 +741,7 @@ public class LocalServer extends RouterNanoHTTPD {
             int type = 0;
             String card = null;
 
+            /* get json parameter */
             try {
                 HashMap<String, String> map = new HashMap<>();
                 session.parseBody(map);
@@ -609,6 +768,7 @@ public class LocalServer extends RouterNanoHTTPD {
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), "{\"code\":403,\"data\":{\"err_msg\":\"无效操作: 未指定卡牌\"},\"msg\":\"非法操作\"}");
                 }
             } catch (IOException | ResponseException | JSONException e) {
+                /* error parameter */
                 return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), "{\"code\":403,\"data\":{\"err_msg\":\"type 错误\"},\"msg\":\"非法操作\"}");
             }
 
@@ -620,8 +780,10 @@ public class LocalServer extends RouterNanoHTTPD {
 
                 if (game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.READY) {
                     try {
+                        /* commit an operation on game*/
                         Tuple<Boolean, String, String> opres = game.operate(id, type == 0 ? GameOperation.turnOver : GameOperation.putCard, card);
                         if (!opres.first) {
+                            /* error operation */
                             JSONObject res = new JSONObject();
                             JSONObject data = new JSONObject();
 
@@ -633,6 +795,7 @@ public class LocalServer extends RouterNanoHTTPD {
 
                             return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), res.toString());
                         } else {
+                            /* success */
                             JSONObject res = new JSONObject();
                             JSONObject data = new JSONObject();
 
@@ -661,6 +824,11 @@ public class LocalServer extends RouterNanoHTTPD {
             return NanoHTTPD.newFixedLengthResponse(Response.Status.NOT_FOUND, getMimeType(), "{\"code\": 404, \"data\": {}, \"msg\": \"Not Found\"}");
         }
 
+        /**
+         * Handle for GET method
+         * Get full message of specific game, only can be used after game over
+         * @see <a href="https://www.showdoc.com.cn/1605811132048301/7630674256869020"></a>
+         */
         @Override
         public Response get(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
             String token = session.getHeaders().get("authorization");
@@ -680,8 +848,6 @@ public class LocalServer extends RouterNanoHTTPD {
                 OneGame game = LocalServer.gameList.get(uuid);
                 assert game != null;
 
-                int id = LocalServer.playerList.get(token);
-
                 try {
                     if (game.getGameStatus() == GameStatus.OVER) {
                         Tuple<String, String, Integer> last = game.getLast();
@@ -693,6 +859,7 @@ public class LocalServer extends RouterNanoHTTPD {
                         StringBuilder client_hand = new StringBuilder();
                         StringBuilder card_placement = new StringBuilder();
 
+                        /* show cards in each place */
                         for (String i : game.card_at_p1) {
                             host_hand.append(i).append(",");
                         }
@@ -741,6 +908,10 @@ public class LocalServer extends RouterNanoHTTPD {
         }
     }
 
+    /** indexHandler
+     * Handler for api "/api/game/index/"
+     * List all public games on server
+     */
     public static class indexHandler extends DefaultHandler {
 
         @Override
@@ -758,6 +929,11 @@ public class LocalServer extends RouterNanoHTTPD {
             return Response.Status.UNAUTHORIZED;
         }
 
+        /**
+         * Hanlder for GET method
+         * return list of public games
+         * @see <a href="https://www.showdoc.com.cn/1605811132048301/7630727968009683"></a>
+         */
         @Override
         public Response get(UriResource uriResource, Map<String, String> urlParams, IHTTPSession session) {
             String token = session.getHeaders().get("authorization");
@@ -771,9 +947,10 @@ public class LocalServer extends RouterNanoHTTPD {
             int page_size = Integer.parseInt(Objects.requireNonNull(urlParams.get("page_size")));
             int page_num = Integer.parseInt(Objects.requireNonNull(urlParams.get("page_num")));
 
-            if (page_num <= 0 || page_size * (page_num - 1) > game_pub - 1) page_num = 1;
-            if (page_size <= 0) page_size = game_pub;
+            if (page_num <= 0 || page_size * (page_num - 1) > game_public - 1) page_num = 1;
+            if (page_size <= 0) page_size = game_public;
 
+            /* mark begin index for recording */
             int cnt = 0;
             int begin = page_size * (page_num - 1);
 
@@ -810,8 +987,8 @@ public class LocalServer extends RouterNanoHTTPD {
 
             try {
                 data.put("games", games)
-                        .put("total", LocalServer.game_pub)
-                        .put("total_page_num", game_pub / page_size);
+                        .put("total", LocalServer.game_public)
+                        .put("total_page_num", game_public / page_size);
                 json.put("code", 200)
                         .put("data", data)
                         .put("msg", "操作成功");
@@ -846,6 +1023,9 @@ public class LocalServer extends RouterNanoHTTPD {
 
     }
 
+    /**
+     * add routers for apis
+     */
     public void addMappings() {
         addRoute("/api/user/login/", LoginHandler.class);
         addRoute("/api/game/", GameControlHandler.class);
@@ -853,10 +1033,20 @@ public class LocalServer extends RouterNanoHTTPD {
         setNotFoundHandler(_404Handler.class);
     }
 
+    /**
+     * add route on server
+     * private usage
+     */
     public void addMapping(String url, Class<?> obj) {
         addRoute(url, obj);
     }
 
+    /**
+     * create a new game and generate uuid for it.
+     * @param id player id to be set host
+     * @param priv private status
+     * @return uuid
+     */
     public static String createGame(int id, boolean priv) {
         String guuid = UUID.randomUUID().toString();
         guuid = guuid.substring(0, 8) +

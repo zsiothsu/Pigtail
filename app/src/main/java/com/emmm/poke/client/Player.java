@@ -27,7 +27,15 @@ import okhttp3.Response;
 import okio.BufferedSink;
 
 
+/** OneGame_Simple
+ * Implement a game instance. Update status by information
+ * from game server.
+ */
 class OneGame_Simple {
+    /******************************************
+     *            game information            *
+     ******************************************/
+    /* cards */
     public int card_group;
     public Stack<String> card_placement;
     public int rest_S;
@@ -45,6 +53,9 @@ class OneGame_Simple {
     public int winner = -1;
     public boolean finished = false;
 
+    /******************************************
+     *      game controlling information      *
+     ******************************************/
     public Vector<String> log;
     public Vector<String> log_msg;
 
@@ -71,6 +82,16 @@ class OneGame_Simple {
         log_msg = new Vector<String>();
     }
 
+    /**
+     * do an operation: put a card or turn over from card group
+     *
+     * @param host      player order, 0: host  1:guest
+     * @param op        game operation
+     * @param card      card put or turned over
+     * @return Tuple.first: isSuccess
+     * Tuple.second: code likes '0 0 H7'
+     * Tuple.third: full log message
+     */
     public Tuple<Boolean, String, String> operate(int host, GameOperation op, String card) {
         if(this.card_group <= 0) {
             return new  Tuple<Boolean, String, String>(false, new String(), new String());
@@ -85,6 +106,7 @@ class OneGame_Simple {
             card_group -= 1;
             this.card_placement.push(card);
 
+            /* turn over a card with 'type' from card group */
             char type = card.charAt(0);
             switch (type) {
                 case 'S':
@@ -101,6 +123,10 @@ class OneGame_Simple {
                     break;
             }
 
+            /*
+              if types of new card and card on old top is the same,
+              move all cards to player
+             */
             if (!(old_top == null) && old_top.charAt(0) == type) {
                 Vector<String> player_card_group = host == 0 ? this.card_at_p1 : this.card_at_p2;
 
@@ -289,10 +315,13 @@ public class Player {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
 
-                        token = json.getJSONObject("data")
-                                .getString("token");
-
-                        ret_value = true;
+                        if(json.has("status") && json.getInt("status") == 200) {
+                            token = json.getJSONObject("data")
+                                    .getString("token");
+                            ret_value = true;
+                        } else {
+                            ret_value = false;
+                        }
                     } else {
                         ret_value = false;
                     }
