@@ -27,7 +27,8 @@ import okhttp3.Response;
 import okio.BufferedSink;
 
 
-/** OneGame_Simple
+/**
+ * OneGame_Simple
  * Implement a game instance. Update status by information
  * from game server.
  */
@@ -85,16 +86,16 @@ class OneGame_Simple {
     /**
      * do an operation: put a card or turn over from card group
      *
-     * @param host      player order, 0: host  1:guest
-     * @param op        game operation
-     * @param card      card put or turned over
+     * @param host player order, 0: host  1:guest
+     * @param op   game operation
+     * @param card card put or turned over
      * @return Tuple.first: isSuccess
      * Tuple.second: code likes '0 0 H7'
      * Tuple.third: full log message
      */
     public Tuple<Boolean, String, String> operate(int host, GameOperation op, String card) {
-        if(this.card_group <= 0) {
-            return new  Tuple<Boolean, String, String>(false, new String(), new String());
+        if (this.card_group <= 0) {
+            return new Tuple<Boolean, String, String>(false, new String(), new String());
         }
 
         String id_string = host == 0 ? "P1" : "P2";
@@ -134,7 +135,7 @@ class OneGame_Simple {
                     String top_card = this.card_placement.pop();
                     player_card_group.add(top_card);
 
-                    if(host == 0) {
+                    if (host == 0) {
                         char ctype = top_card.charAt(0);
                         switch (ctype) {
                             case 'S':
@@ -199,7 +200,7 @@ class OneGame_Simple {
                     String top_card = this.card_placement.pop();
                     player_card_group.add(top_card);
 
-                    if(host == 0) {
+                    if (host == 0) {
                         char ctype = top_card.charAt(0);
                         switch (ctype) {
                             case 'S':
@@ -233,6 +234,10 @@ class OneGame_Simple {
     }
 }
 
+/**
+ * Player
+ * Store player information and perform player actions
+ */
 public class Player {
     /******************************************
      *           server information           *
@@ -251,31 +256,56 @@ public class Player {
 
     public AI ai;
     /******************************************
-     *            game information            *
+     *           thread controller            *
      ******************************************/
+    /*
+       Android must use a non-UI thread to use the network.
+       Semaphore and lock are used for thread control
+     */
+    /* prevent players from making multiple requests to the server at the same time */
     private final Lock lock = new ReentrantLock();
+    /* waiting for network thread to return */
     private final Semaphore semaphore = new Semaphore(0, true);
     Object ret_value = null;
 
     /******************************************
-     *            game information            *
+     *                 game                   *
      ******************************************/
     public OneGame_Simple game = null;
 
     /******************************************
      *             basic function             *
      ******************************************/
+    /**
+     * Player initializing
+     *
+     * @param username user name login to server, randomly username and
+     *                 password is ok if login to local server
+     * @param password password
+     */
     public Player(String username, String password) {
         this.username = username;
         this.password = password;
         this.ai = new AI(this);
     }
 
+    /**
+     * Set Login server
+     *
+     * @param ip   server ip
+     * @param port server port
+     */
     public void setLoginServer(String ip, int port) {
         this.server_login_ip = ip;
         this.server_login_port = port;
     }
 
+    /**
+     * Set game server
+     *
+     * @param ip   server ip
+     * @param port server port
+     */
     public void setGameServer(String ip, int port) {
         this.server_game_ip = ip;
         this.server_game_port = port;
@@ -284,6 +314,14 @@ public class Player {
     /******************************************
      *             game controller            *
      ******************************************/
+    /**
+     * Login to server
+     *
+     * @return true: login successfully
+     * false: failed to login in to server
+     * @throws InterruptedException Thrown when a thread is waiting,
+     *                              sleeping, or otherwise occupied, and the thread is interrupted.
+     */
     public boolean login() throws InterruptedException {
         new Thread(new Runnable() {
             @Override
@@ -301,12 +339,12 @@ public class Player {
 
                     FormBody.Builder formBody = new FormBody.Builder();
                     formBody.add("student_id", username)
-                            .add("password", password);
+                        .add("password", password);
 
                     Request request = new Request.Builder()
-                            .url(url)
-                            .post(formBody.build())
-                            .build();
+                        .url(url)
+                        .post(formBody.build())
+                        .build();
                     Response response = null;
 
                     response = client.newCall(request).execute();
@@ -315,11 +353,14 @@ public class Player {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
 
-                        if(json.has("status") && json.getInt("status") == 200) {
+                        /* GET 200/OK, return user token */
+                        if (json.has("status") && json.getInt("status") == 200) {
                             token = json.getJSONObject("data")
-                                    .getString("token");
+                                .getString("token");
                             ret_value = true;
-                        } else {
+                        }
+                        /* return 404/NOT_FOUND， error username or password */
+                        else {
                             ret_value = false;
                         }
                     } else {
@@ -329,22 +370,33 @@ public class Player {
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
+                    /* unlock thread, tell main thread that result is ready */
                     lock.unlock();
                     semaphore.release();
                 }
             }
         }).start();
 
+        /* waiting for network thread to return */
         semaphore.acquire();
         return (boolean) ret_value;
     }
 
+    /**
+     * Create a new game
+     *
+     * @param priv private status
+     * @return uuid
+     * @throws InterruptedException Thrown when a thread is waiting,
+     *                              sleeping, or otherwise occupied, and the thread is interrupted
+     */
     public String createGame(boolean priv) throws InterruptedException {
         new Thread(new Runnable() {
             @Override
             public void run() {
                 lock.lock();
                 try {
+                    /* return if user haven't logged in */
                     if (server_game_ip == null || server_game_port == -1 || token == null) {
                         ret_value = null;
                     }
@@ -356,15 +408,16 @@ public class Player {
                     OkHttpClient client = new OkHttpClient();
                     RequestBody body = RequestBody.create(JSON, urlParam);
                     Request request = new Request.Builder()
-                            .url(url)
-                            .addHeader("Authorization", token)
-                            .addHeader("Content-Type", "application/json")
-                            .post(body)
-                            .build();
+                        .url(url)
+                        .addHeader("Authorization", token)
+                        .addHeader("Content-Type", "application/json")
+                        .post(body)
+                        .build();
                     Response response = null;
 
                     response = client.newCall(request).execute();
 
+                    /* Successfully create a new game */
                     if (response.isSuccessful()) {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
@@ -372,30 +425,44 @@ public class Player {
                         uuid = json.getJSONObject("data").getString("uuid");
                         ret_value = uuid;
 
+                        /* set the player as host */
                         host = 0;
                         game = new OneGame_Simple();
-                    } else {
+                    }
+                    /* return 401/UNAUTHORIZED */
+                    else {
                         ret_value = null;
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
+                    /* unlock thread, tell main thread that result is ready */
                     lock.unlock();
                     semaphore.release();
                 }
             }
         }).start();
 
+        /* waiting for network thread to return */
         semaphore.acquire();
         return (String) ret_value;
     }
 
+    /**
+     * Join specific game
+     *
+     * @param _uuid game uuid
+     * @return is joined the game
+     * @throws InterruptedException Thrown when a thread is waiting,
+     *                              sleeping, or otherwise occupied, and the thread is interrupted
+     */
     public boolean joinGame(String _uuid) throws InterruptedException {
         new Thread(new Runnable() {
             @Override
             public void run() {
                 lock.lock();
                 try {
+                    /* error parameter */
                     if (server_game_ip == null || server_game_port == -1 || token == null || _uuid == null) {
                         ret_value = false;
                     }
@@ -404,10 +471,10 @@ public class Player {
 
                     OkHttpClient client = new OkHttpClient();
                     Request request = new Request.Builder()
-                            .url(url)
-                            .addHeader("Authorization", token)
-                            .post(new FormBody.Builder().build())
-                            .build();
+                        .url(url)
+                        .addHeader("Authorization", token)
+                        .post(new FormBody.Builder().build())
+                        .build();
                     Response response = null;
                     response = client.newCall(request).execute();
 
@@ -415,6 +482,7 @@ public class Player {
                         ret_value = true;
                         uuid = _uuid;
 
+                        /* set the player as guest */
                         host = 1;
                         game = new OneGame_Simple();
                     } else {
@@ -424,16 +492,29 @@ public class Player {
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
+                    /* unlock thread, tell main thread that result is ready */
                     lock.unlock();
                     semaphore.release();
                 }
             }
         }).start();
 
+        /* waiting for network thread to return */
         semaphore.acquire();
         return (boolean) ret_value;
     }
 
+    /**
+     * Perform user operation
+     *
+     * @param op   game operation. put a card or turn over from card group
+     * @param card card
+     * @return Tuple.first: last code
+     * Tuple.second: last log message
+     * Tuple.third: turn now
+     * @throws InterruptedException Thrown when a thread is waiting,
+     *                              sleeping, or otherwise occupied, and the thread is interrupted
+     */
     public Tuple<Boolean, String, String> operate(GameOperation op, String card) throws InterruptedException {
         new Thread(new Runnable() {
             @Override
@@ -446,21 +527,25 @@ public class Player {
 
                     String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid;
                     String urlParam = op == GameOperation.putCard ?
-                            "{\"type\":1, \"card\":\"" + card + "\"}" :
-                            "{\"type\":0}";
+                        "{\"type\":1, \"card\":\"" + card + "\"}" :
+                        "{\"type\":0}";
 
                     MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
                     OkHttpClient client = new OkHttpClient();
                     RequestBody body = RequestBody.create(JSON, urlParam);
                     Request request = new Request.Builder()
-                            .url(url)
-                            .addHeader("Authorization", token)
-                            .addHeader("Content-Type", "application/json")
-                            .put(body)
-                            .build();
+                        .url(url)
+                        .addHeader("Authorization", token)
+                        .addHeader("Content-Type", "application/json")
+                        .put(body)
+                        .build();
                     Response response = client.newCall(request).execute();
 
+                    /*
+                       200/OK: success
+                       403/FORBIDDEN: game is waiting or error operation
+                     */
                     if (response.isSuccessful() || response.code() == 403) {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
@@ -469,8 +554,7 @@ public class Player {
                         String last_code = data.getString("last_code");
                         String last_msg = data.getString("last_msg");
 
-                        ret_value = new Tuple<Boolean, String, String>(true, last_code, last_msg);
-//                        game.operate(host, op, card);
+                        ret_value = new Tuple<Boolean, String, String>(response.code() == 200, last_code, last_msg);
                     } else {
                         ret_value = new Tuple<Boolean, String, String>(false, "请求超时", "");
                     }
@@ -488,6 +572,14 @@ public class Player {
         return (Tuple<Boolean, String, String>) ret_value;
     }
 
+    /**
+     * Get last operation code to update game. judge whether is player's turn
+     *
+     * @return true: is player's turn
+     * false: is not player's turn
+     * @throws InterruptedException Thrown when a thread is waiting,
+     *                              sleeping, or otherwise occupied, and the thread is interrupted
+     */
     public boolean getLast() throws InterruptedException {
         new Thread(new Runnable() {
             @Override
@@ -502,12 +594,13 @@ public class Player {
 
                     OkHttpClient client = new OkHttpClient();
                     Request request = new Request.Builder()
-                            .url(url)
-                            .addHeader("Authorization", token)
-                            .get()
-                            .build();
+                        .url(url)
+                        .addHeader("Authorization", token)
+                        .get()
+                        .build();
                     Response response = client.newCall(request).execute();
 
+                    /* game is playing or over */
                     if (response.isSuccessful() || response.code() == 401) {
                         String res = response.body().string();
                         JSONObject json = new JSONObject(res);
@@ -516,9 +609,15 @@ public class Player {
                         String last_code = data.getString("last_code");
                         boolean your_turn = data.getBoolean("your_turn");
 
+                        /* perform the player's steps in the locally stored game */
                         String[] code = last_code.trim().split(" ");
-                        //TODO: 判断
-                        if (last_code.length() != 0 && (game.log.isEmpty() || (!game.log.isEmpty() && !game.log.lastElement().equals(last_code)))) {
+                        if (last_code.length() != 0 && (
+                            /* game is just begin */
+                            game.log.isEmpty() || (
+                                /* block duplicate steps */
+                                !game.log.isEmpty() && !game.log.lastElement().equals(last_code))
+                        )
+                        ) {
                             if (code[1].equals("0")) {
                                 game.operate(Integer.parseInt(code[0]), GameOperation.turnOver, code[2]);
                             } else {
@@ -543,6 +642,17 @@ public class Player {
         return (boolean) ret_value;
     }
 
+    /**
+     * Operate and update game stored locally
+     *
+     * @param op   game operation. put a card or turn over from card group
+     * @param card card
+     * @return Tuple.first: last code
+     * Tuple.second: last log message
+     * Tuple.third: turn now
+     * @throws InterruptedException Thrown when a thread is waiting,
+     *                              sleeping, or otherwise occupied, and the thread is interrupted
+     */
     public Tuple<Boolean, String, String> operate_update(GameOperation op, String card) throws InterruptedException {
         Tuple<Boolean, String, String> ret = operate(op, card);
         Thread.sleep(1);
@@ -551,12 +661,24 @@ public class Player {
         return ret;
     }
 
+    /**
+     * Determine whether game is over
+     *
+     * @return true: finished
+     * false: unfinished
+     */
     public boolean isGameOver() {
         return this.game.finished;
     }
 
+    /**
+     * Determine whether the player is winner
+     *
+     * @return true: win
+     * false: lose or draw
+     */
     public boolean winner() {
-        if(isGameOver()){
+        if (isGameOver()) {
             return this.host == game.winner;
         }
         return false;

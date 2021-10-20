@@ -185,128 +185,138 @@ class OneGame {
             return new Tuple<Boolean, String, String>(false, "对局已结束", new String());
         }
 
-        /* backup turn for rollback */
-        int turn_bak = turn;
+        turn_lock.lock();
 
-        /* block player not with this turn */
-        if (this.gameStatus == GameStatus.PLAYING) {
-            if (!(turn == 0 ? (host_id == player_id) : (guest_id == player_id))) {
-                return new Tuple<Boolean, String, String>(false, "还不是你的回合", new String());
+        try {
+            /* backup turn for rollback */
+            int turn_bak = turn;
+
+            /* block player not with this turn */
+            if (this.gameStatus == GameStatus.PLAYING) {
+                if (!(turn == 0 ? (host_id == player_id) : (guest_id == player_id))) {
+                    turn_lock.unlock();
+                    return new Tuple<Boolean, String, String>(false, "还不是你的回合", new String());
+                }
             }
-        }
 
-        int id = turn;
-        String id_string = id == 0 ? "P1" : "P2";
-        String op_string = op == GameOperation.turnOver ? "从\u003c牌库\u003e翻开了一张" : "从\u003c手牌\u003e打出了一张";
-        String res = null;
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+            int id = turn;
+            String id_string = id == 0 ? "P1" : "P2";
+            String op_string = op == GameOperation.turnOver ? "从\u003c牌库\u003e翻开了一张" : "从\u003c手牌\u003e打出了一张";
+            String res = null;
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
-        if (op == GameOperation.turnOver) {
-            String new_card = this.card_group.pop();
-            String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
+            if (op == GameOperation.turnOver) {
+                String new_card = this.card_group.pop();
+                String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
 
-            /* turn over from  card group */
-            card = new_card;
-            this.card_placement.push(new_card);
+                /* turn over from  card group */
+                card = new_card;
+                this.card_placement.push(new_card);
 
             /*
               if types of new card and card on old top is the same,
               move all cards to player
              */
-            if (!(old_top == null) && old_top.charAt(0) == new_card.charAt(0)) {
+                if (!(old_top == null) && old_top.charAt(0) == new_card.charAt(0)) {
+                    Vector<String> player_card_group = turn == 0 ? this.card_at_p1 : this.card_at_p2;
+
+                    while (!this.card_placement.empty()) {
+                        player_card_group.add(this.card_placement.pop());
+                    }
+
+                    res = " 并拿走了\u003c放置区\u003e的卡牌";
+                }
+
+                /* game comes to end */
+                if (this.card_group.empty()) {
+                    this.gameStatus = GameStatus.OVER;
+
+                    if (this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 0;
+                    else if (this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 1;
+                    else this.winner = -1; // no winner
+
+                    this.finished = true;
+                }
+
+                if (this.gameStatus == GameStatus.READY) {
+                    /* set turn for first hand player */
+                    this.turn = player_id == host_id ? 1 : 0;
+                    /* game start after first operation */
+                    this.gameStatus = GameStatus.PLAYING;
+                } else {
+                    this.turn = (this.turn + 1) % 2;
+                }
+
+                /* logger */
+                id = (this.turn + 1) % 2;
+                id_string = id == 0 ? "P1" : "P2";
+
+                String code = id + " 0 " + card;
+                String msg = id_string + " " + op_string + " " + card;
+                if (res != null) msg += res;
+
+                this.log.add(code);
+                this.log_msg.add(msg);
+
+                this.updated_at = formatter.format(new Date()).trim();
+                String[] timestr = this.updated_at.split(" ");
+                this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
+
+                turn_lock.unlock();
+                return new Tuple<Boolean, String, String>(true, code, msg);
+            } else {
+                String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
                 Vector<String> player_card_group = turn == 0 ? this.card_at_p1 : this.card_at_p2;
 
-                while (!this.card_placement.empty()) {
-                    player_card_group.add(this.card_placement.pop());
+                /* error operation */
+                if (card == null || !player_card_group.contains(card)) {
+                    this.gameStatus = GameStatus.READY;
+                    this.turn = turn_bak;
+                    turn_lock.unlock();
+                    return new Tuple<Boolean, String, String>(false, "非法操作", new String());
                 }
 
-                res = " 并拿走了\u003c放置区\u003e的卡牌";
-            }
-
-            /* game comes to end */
-            if (this.card_group.empty()) {
-                this.gameStatus = GameStatus.OVER;
-
-                if (this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 0;
-                else if (this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 1;
-                else this.winner = -1; // no winner
-
-                this.finished = true;
-            }
-
-            if (this.gameStatus == GameStatus.READY) {
-                /* set turn for first hand player */
-                this.turn = player_id == host_id ? 1 : 0;
-                /* game start after first operation */
-                this.gameStatus = GameStatus.PLAYING;
-            } else {
-                this.turn = (this.turn + 1) % 2;
-            }
-
-            /* logger */
-            id = (this.turn + 1) % 2;
-            id_string = id == 0 ? "P1" : "P2";
-
-            String code = id + " 0 " + card;
-            String msg = id_string + " " + op_string + " " + card;
-            if (res != null) msg += res;
-
-            this.log.add(code);
-            this.log_msg.add(msg);
-
-            this.updated_at = formatter.format(new Date()).trim();
-            String[] timestr = this.updated_at.split(" ");
-            this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
-
-            return new Tuple<Boolean, String, String>(true, code, msg);
-        } else {
-            String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
-            Vector<String> player_card_group = turn == 0 ? this.card_at_p1 : this.card_at_p2;
-
-            /* error operation */
-            if (card == null || !player_card_group.contains(card)) {
-                this.gameStatus = GameStatus.READY;
-                this.turn = turn_bak;
-                return new Tuple<Boolean, String, String>(false, "非法操作", new String());
-            }
-
-            this.card_placement.push(card);
+                this.card_placement.push(card);
 
             /*
               if types of new card and card on old top is the same,
               move all cards to player
              */
-            if (!(old_top == null) && old_top.charAt(0) == card.charAt(0)) {
-                while (!this.card_placement.empty()) {
-                    player_card_group.add(this.card_placement.pop());
+                if (!(old_top == null) && old_top.charAt(0) == card.charAt(0)) {
+                    while (!this.card_placement.empty()) {
+                        player_card_group.add(this.card_placement.pop());
+                    }
+                    res = " 并拿走了\u003c放置区\u003e的卡牌";
                 }
-                res = " 并拿走了\u003c放置区\u003e的卡牌";
+
+                /* set turn for first hand player */
+                if (this.gameStatus == GameStatus.READY) {
+                    this.turn = player_id == host_id ? 1 : 0;
+                    this.gameStatus = GameStatus.PLAYING;
+                } else {
+                    this.turn = (this.turn + 1) % 2;
+                }
+
+                /* logger */
+                id = (this.turn + 1) % 2;
+                id_string = id == 0 ? "P1" : "P2";
+
+                String code = id + " 0 " + card;
+                String msg = id_string + " " + op_string + " " + card;
+                if (res != null) msg += res;
+
+                this.log.add(code);
+                this.log_msg.add(msg);
+
+                this.updated_at = formatter.format(new Date()).trim();
+                String[] timestr = this.updated_at.split(" ");
+                this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
+
+                turn_lock.unlock();
+                return new Tuple<Boolean, String, String>(true, code, msg);
             }
-
-            /* set turn for first hand player */
-            if (this.gameStatus == GameStatus.READY) {
-                this.turn = player_id == host_id ? 1 : 0;
-                this.gameStatus = GameStatus.PLAYING;
-            } else {
-                this.turn = (this.turn + 1) % 2;
-            }
-
-            /* logger */
-            id = (this.turn + 1) % 2;
-            id_string = id == 0 ? "P1" : "P2";
-
-            String code = id + " 0 " + card;
-            String msg = id_string + " " + op_string + " " + card;
-            if (res != null) msg += res;
-
-            this.log.add(code);
-            this.log_msg.add(msg);
-
-            this.updated_at = formatter.format(new Date()).trim();
-            String[] timestr = this.updated_at.split(" ");
-            this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
-
-            return new Tuple<Boolean, String, String>(true, code, msg);
+        } finally {
+            turn_lock.unlock();
         }
     }
 
@@ -333,8 +343,8 @@ class OneGame {
      * get last operation code
      *
      * @return Tuple.first: last code
-     * Tuple.second: last log message
-     * Tuple.third: turn now
+     *         Tuple.second: last log message
+     *         Tuple.third: turn now
      */
     public Tuple<String, String, Integer> getLast() {
         /* <log, log_msg, turn now> */
@@ -756,6 +766,7 @@ public class LocalServer extends RouterNanoHTTPD {
                     type = query.getInt("type");
                 }
 
+                /* error operational type */
                 if (type != 0 && type != 1) {
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), "{\"code\":403,\"data\":{\"err_msg\":\"type 错误\"},\"msg\":\"非法操作\"}");
                 }
@@ -764,6 +775,7 @@ public class LocalServer extends RouterNanoHTTPD {
                     card = query.getString("card");
                 }
 
+                /* put no card */
                 if (type == 1 && card == null) {
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), "{\"code\":403,\"data\":{\"err_msg\":\"无效操作: 未指定卡牌\"},\"msg\":\"非法操作\"}");
                 }
