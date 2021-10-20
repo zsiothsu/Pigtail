@@ -375,7 +375,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        }).start();
+        },"Thread_login").start();
 
         /* waiting for network thread to return */
         semaphore.acquire();
@@ -441,7 +441,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        }).start();
+        },"Thread_createGame").start();
 
         /* waiting for network thread to return */
         semaphore.acquire();
@@ -497,7 +497,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        }).start();
+        },"Thread_joinGame").start();
 
         /* waiting for network thread to return */
         semaphore.acquire();
@@ -566,7 +566,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        }).start();
+        }, "Thread_operate").start();
 
         semaphore.acquire();
         return (Tuple<Boolean, String, String>) ret_value;
@@ -636,7 +636,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        }).start();
+        }, "Thread_getLast").start();
 
         semaphore.acquire();
         return (boolean) ret_value;

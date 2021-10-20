@@ -6,6 +6,8 @@ import com.emmm.poke.utils.GameOperation;
 
 import java.util.Vector;
 
+import android.os.Debug;
+
 public class AI {
     Player player;
     boolean status;
@@ -23,37 +25,55 @@ public class AI {
     }
 
     public void active() throws InterruptedException {
+
+        Debug.startMethodTracing();
+
         char top_card = player.game.card_placement.empty()
-                ? 'N'
-                : player.game.card_placement.peek().charAt(0);
+            ? 'N'
+            : player.game.card_placement.peek().charAt(0);
 
-        Pair<Double, Character> max_card = new Pair<Double, Character>(0.0, 'N');
-        Pair<Double, Character> gtS = new Pair<Double, Character>((double) player.game.rest_S / player.game.card_group, 'S');
-        if (gtS.first > max_card.first) max_card = gtS;
-        Pair<Double, Character> gtH = new Pair<Double, Character>((double) player.game.rest_H / player.game.card_group, 'H');
-        if (gtH.first > max_card.first) max_card = gtH;
-        Pair<Double, Character> gtC = new Pair<Double, Character>((double) player.game.rest_C / player.game.card_group, 'C');
-        if (gtC.first > max_card.first) max_card = gtC;
-        Pair<Double, Character> gtD = new Pair<Double, Character>((double) player.game.rest_D / player.game.card_group, 'D');
-        if (gtD.first > max_card.first) max_card = gtD;
+        /* get the most card type in card group */
+        Pair<Double, Character> most_type_in_group = new Pair<Double, Character>(0.0, 'N');
+        Pair<Double, Character> get_chance_S = new Pair<Double, Character>((double) player.game.rest_S / player.game.card_group, 'S');
+        if (get_chance_S.first > most_type_in_group.first) most_type_in_group = get_chance_S;
+        Pair<Double, Character> get_chance_H = new Pair<Double, Character>((double) player.game.rest_H / player.game.card_group, 'H');
+        if (get_chance_H.first > most_type_in_group.first) most_type_in_group = get_chance_H;
+        Pair<Double, Character> get_chance_C = new Pair<Double, Character>((double) player.game.rest_C / player.game.card_group, 'C');
+        if (get_chance_C.first > most_type_in_group.first) most_type_in_group = get_chance_C;
+        Pair<Double, Character> get_chance_D = new Pair<Double, Character>((double) player.game.rest_D / player.game.card_group, 'D');
+        if (get_chance_D.first > most_type_in_group.first) most_type_in_group = get_chance_D;
 
-        int otS = player.game.own_S;
-        int otH = player.game.own_H;
-        int otC = player.game.own_C;
-        int otD = player.game.own_D;
+        int player_own_S = player.game.own_S;
+        int player_own_H = player.game.own_H;
+        int player_own_C = player.game.own_C;
+        int player_own_D = player.game.own_D;
 
         Vector<String> own_card = player.host == 0 ? player.game.card_at_p1 : player.game.card_at_p2;
 
         boolean status = false;
-        /* put card */
-        if ((top_card != 'S' && max_card.second == 'S' && otS > 0)
-                || (top_card != 'H' && max_card.second == 'H' && otH > 0)
-                || (top_card != 'C' && max_card.second == 'C' && otC > 0)
-                || (top_card != 'D' && max_card.second == 'D' && otD > 0)
+    /*
+       put card
+       if have the same type as the card type in card group
+     */
+        if ((top_card != 'S' && most_type_in_group.second == 'S' && player_own_S > 0)
+            || (top_card != 'H' && most_type_in_group.second == 'H' && player_own_H > 0)
+            || (top_card != 'C' && most_type_in_group.second == 'C' && player_own_C > 0)
+            || (top_card != 'D' && most_type_in_group.second == 'D' && player_own_D > 0)
         ) {
             String card = null;
             for (String c : own_card) {
-                if(c.charAt(0) == max_card.second) {
+                if (c.charAt(0) == most_type_in_group.second) {
+                    card = c;
+                    player.operate_update(GameOperation.putCard, card);
+                    status = true;
+                    break;
+                }
+            }
+        }
+        if (!status && top_card == most_type_in_group.second) {
+            String card = null;
+            for (String c : own_card) {
+                if (c.charAt(0) != most_type_in_group.second) {
                     card = c;
                     player.operate_update(GameOperation.putCard, card);
                     status = true;
@@ -62,8 +82,10 @@ public class AI {
             }
         }
         /* turn over */
-        if(!status) {
+        if (!status) {
             player.operate_update(GameOperation.turnOver, null);
         }
+
+        Debug.stopMethodTracing();
     }
 }
