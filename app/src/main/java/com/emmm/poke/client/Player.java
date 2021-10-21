@@ -36,6 +36,13 @@ class OneGame_Simple {
     /******************************************
      *            game information            *
      ******************************************/
+    public static final String[] card_new = {
+        "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "SJ", "SQ", "SK",
+        "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "HJ", "HQ", "HK",
+        "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "CJ", "CQ", "CK",
+        "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "DJ", "DQ", "DK"
+    };
+
     /* cards */
     public int card_group;
     public Stack<String> card_placement;
@@ -87,13 +94,14 @@ class OneGame_Simple {
      * do an operation: put a card or turn over from card group
      *
      * @param host player order, 0: host  1:guest
+     * @param order own order.
      * @param op   game operation
      * @param card card put or turned over
      * @return Tuple.first: isSuccess
      * Tuple.second: code likes '0 0 H7'
      * Tuple.third: full log message
      */
-    public Tuple<Boolean, String, String> operate(int host, GameOperation op, String card) {
+    public Tuple<Boolean, String, String> operate(int host, int order, GameOperation op, String card) {
         if (this.card_group <= 0) {
             return new Tuple<Boolean, String, String>(false, new String(), new String());
         }
@@ -135,7 +143,7 @@ class OneGame_Simple {
                     String top_card = this.card_placement.pop();
                     player_card_group.add(top_card);
 
-                    if (host == 0) {
+                    if (host == order) {
                         char ctype = top_card.charAt(0);
                         switch (ctype) {
                             case 'S':
@@ -178,21 +186,24 @@ class OneGame_Simple {
             Vector<String> player_card_group = host == 0 ? this.card_at_p1 : this.card_at_p2;
 
             this.card_placement.push(card);
+            player_card_group.remove(card);
 
-            char type = card.charAt(0);
-            switch (type) {
-                case 'S':
-                    own_S--;
-                    break;
-                case 'H':
-                    own_H--;
-                    break;
-                case 'C':
-                    own_C--;
-                    break;
-                case 'D':
-                    own_D--;
-                    break;
+            if(host == order) {
+                char type = card.charAt(0);
+                switch (type) {
+                    case 'S':
+                        own_S--;
+                        break;
+                    case 'H':
+                        own_H--;
+                        break;
+                    case 'C':
+                        own_C--;
+                        break;
+                    case 'D':
+                        own_D--;
+                        break;
+                }
             }
 
             if (!(old_top == null) && old_top.charAt(0) == card.charAt(0)) {
@@ -200,7 +211,7 @@ class OneGame_Simple {
                     String top_card = this.card_placement.pop();
                     player_card_group.add(top_card);
 
-                    if (host == 0) {
+                    if (host == order) {
                         char ctype = top_card.charAt(0);
                         switch (ctype) {
                             case 'S':
@@ -223,10 +234,11 @@ class OneGame_Simple {
 
             id_string = host == 0 ? "P1" : "P2";
 
-            String code = host + " 0 " + card;
+            String code = host + " 1 " + card;
             String msg = id_string + " " + op_string + " " + card;
             if (res != null) msg += res;
 
+            this.log.add(code);
             this.log_msg.add(msg);
 
             return new Tuple<Boolean, String, String>(true, code, msg);
@@ -263,7 +275,9 @@ public class Player {
        Semaphore and lock are used for thread control
      */
     /* prevent players from making multiple requests to the server at the same time */
-    private final Lock lock = new ReentrantLock();
+    private final static Lock lock = new ReentrantLock();
+    private final static Lock plock = new ReentrantLock();
+    private final static Lock llock = new ReentrantLock();
     /* waiting for network thread to return */
     private final Semaphore semaphore = new Semaphore(0, true);
     Object ret_value = null;
@@ -330,6 +344,7 @@ public class Player {
                 try {
                     if (server_login_ip == null || server_login_port == -1) {
                         ret_value = false;
+                        return;
                     }
 
                     String url = "http://" + server_login_ip + ":" + server_login_port + "/api/user/login/";
@@ -375,7 +390,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        },"Thread_login").start();
+        }, "Thread_login").start();
 
         /* waiting for network thread to return */
         semaphore.acquire();
@@ -399,6 +414,7 @@ public class Player {
                     /* return if user haven't logged in */
                     if (server_game_ip == null || server_game_port == -1 || token == null) {
                         ret_value = null;
+                        return;
                     }
 
                     String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/";
@@ -441,7 +457,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        },"Thread_createGame").start();
+        }, "Thread_createGame").start();
 
         /* waiting for network thread to return */
         semaphore.acquire();
@@ -465,6 +481,7 @@ public class Player {
                     /* error parameter */
                     if (server_game_ip == null || server_game_port == -1 || token == null || _uuid == null) {
                         ret_value = false;
+                        return;
                     }
 
                     String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + _uuid;
@@ -497,7 +514,7 @@ public class Player {
                     semaphore.release();
                 }
             }
-        },"Thread_joinGame").start();
+        }, "Thread_joinGame").start();
 
         /* waiting for network thread to return */
         semaphore.acquire();
@@ -521,8 +538,10 @@ public class Player {
             public void run() {
                 lock.lock();
                 try {
+                    ret_value = null;
                     if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
                         ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
+                        return;
                     }
 
                     String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid;
@@ -581,65 +600,99 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public boolean getLast() throws InterruptedException {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                lock.lock();
-                try {
-                    if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
-                        ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
-                    }
-
-                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid + "/last";
-
-                    OkHttpClient client = new OkHttpClient();
-                    Request request = new Request.Builder()
-                        .url(url)
-                        .addHeader("Authorization", token)
-                        .get()
-                        .build();
-                    Response response = client.newCall(request).execute();
-
-                    /* game is playing or over */
-                    if (response.isSuccessful() || response.code() == 401) {
-                        String res = response.body().string();
-                        JSONObject json = new JSONObject(res);
-                        JSONObject data = json.getJSONObject("data");
-
-                        String last_code = data.getString("last_code");
-                        boolean your_turn = data.getBoolean("your_turn");
-
-                        /* perform the player's steps in the locally stored game */
-                        String[] code = last_code.trim().split(" ");
-                        if (last_code.length() != 0 && (
-                            /* game is just begin */
-                            game.log.isEmpty() || (
-                                /* block duplicate steps */
-                                !game.log.isEmpty() && !game.log.lastElement().equals(last_code))
-                        )
-                        ) {
-                            if (code[1].equals("0")) {
-                                game.operate(Integer.parseInt(code[0]), GameOperation.turnOver, code[2]);
-                            } else {
-                                game.operate(Integer.parseInt(code[0]), GameOperation.putCard, code[2]);
-                            }
+        llock.lock();
+        ret_value = null;
+        try {
+            Thread.sleep(5);
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    lock.lock();
+                    try {
+                        if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
+                            ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
+                            return;
                         }
 
-                        ret_value = your_turn;
-                    } else {
-                        ret_value = false;
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    lock.unlock();
-                    semaphore.release();
-                }
-            }
-        }, "Thread_getLast").start();
+                        String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid + "/last";
 
-        semaphore.acquire();
-        return (boolean) ret_value;
+                        OkHttpClient client = new OkHttpClient();
+                        Request request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .get()
+                            .build();
+                        Response response = client.newCall(request).execute();
+
+                        /* game is playing or over */
+                        if (response.isSuccessful() || response.code() == 400) {
+                            String res = response.body().string();
+                            JSONObject json = new JSONObject(res);
+                            JSONObject data = json.getJSONObject("data");
+
+                            if (json.getInt("code") == 200) {
+                                String last_code = data.getString("last_code");
+                                boolean your_turn = data.getBoolean("your_turn");
+
+                                /* perform the player's steps in the locally stored game */
+                                String[] code = last_code.trim().split(" ");
+                                if (last_code.length() != 0 && (
+                                    /* game is just begin */
+                                    game.log_msg.isEmpty() || (
+                                        /* block duplicate steps */
+                                        !game.log.isEmpty() && !game.log.lastElement().equals(last_code))
+                                )
+                                ) {
+                                    if (code[1].equals("0")) {
+                                        game.operate(Integer.parseInt(code[0]), host, GameOperation.turnOver, code[2]);
+                                    } else {
+                                        game.operate(Integer.parseInt(code[0]), host, GameOperation.putCard, code[2]);
+                                    }
+                                }
+                                ret_value = your_turn;
+                            }
+
+                            if (json.getInt("code") == 400) {
+                                Log.v("code", "400end");
+
+                                if(game.card_group == 1) {
+                                    int base = 0;
+                                    if(game.rest_S == 1) base = 0;
+                                    else if(game.rest_H == 1) base = 13;
+                                    else if(game.rest_C == 1) base = 26;
+                                    else if(game.rest_D ==1 ) base = 39;
+
+                                    for(int i =  base ; i < base + 13;i++) {
+                                        String final_card = OneGame_Simple.card_new[i];
+                                        if(!game.card_at_p1.contains(final_card) &&
+                                           !game.card_at_p2.contains(final_card) &&
+                                           !game.card_placement.contains(final_card)) {
+                                            game.operate((host+1) % 2, host, GameOperation.turnOver, final_card);
+                                            break;
+                                        }
+                                    }
+                                }
+                                ret_value = true;
+                            }
+
+                        } else {
+                            ret_value = false;
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        lock.unlock();
+                        semaphore.release();
+                    }
+                }
+            }, "Thread_getLast").start();
+
+            semaphore.acquire();
+            if (ret_value == null) return false;
+            return (boolean) ret_value;
+        } finally {
+            llock.unlock();
+        }
     }
 
     /**
@@ -654,11 +707,31 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public Tuple<Boolean, String, String> operate_update(GameOperation op, String card) throws InterruptedException {
-        Tuple<Boolean, String, String> ret = operate(op, card);
-        Thread.sleep(1);
-        getLast();
-        Thread.sleep(1);
-        return ret;
+        plock.lock();
+        try {
+            Tuple<Boolean, String, String> ret = operate(op, card);
+            /* perform the player's steps in the locally stored game */
+            if (ret != null && ret.first == true) {
+                String[] code = ret.second.trim().split(" ");
+                if (ret.second.length() != 0 && (
+                    /* game is just begin */
+                    game.log.isEmpty() || (
+                        /* block duplicate steps */
+                        !game.log.isEmpty() && !game.log.lastElement().equals(ret.second))
+                )
+                ) {
+                    if (code[1].equals("0")) {
+                        game.operate(Integer.parseInt(code[0]), host, GameOperation.turnOver, code[2]);
+                    } else {
+                        game.operate(Integer.parseInt(code[0]), host, GameOperation.putCard, code[2]);
+                    }
+                }
+            }
+            Log.v("play", this.host + " rest group " + game.card_group);
+            return ret;
+        } finally {
+            plock.unlock();
+        }
     }
 
     /**

@@ -26,7 +26,7 @@ public class AI {
 
     public void active() throws InterruptedException {
 
-        Debug.startMethodTracing();
+//        Debug.startMethodTracing();
 
         char top_card = player.game.card_placement.empty()
             ? 'N'
@@ -86,6 +86,6 @@ public class AI {
             player.operate_update(GameOperation.turnOver, null);
         }
 
-        Debug.stopMethodTracing();
+//        Debug.stopMethodTracing();
     }
 }

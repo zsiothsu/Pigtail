@@ -194,7 +194,6 @@ class OneGame {
             /* block player not with this turn */
             if (this.gameStatus == GameStatus.PLAYING) {
                 if (!(turn == 0 ? (host_id == player_id) : (guest_id == player_id))) {
-                    turn_lock.unlock();
                     return new Tuple<Boolean, String, String>(false, "还不是你的回合", new String());
                 }
             }
@@ -262,7 +261,6 @@ class OneGame {
                 String[] timestr = this.updated_at.split(" ");
                 this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
 
-                turn_lock.unlock();
                 return new Tuple<Boolean, String, String>(true, code, msg);
             } else {
                 String old_top = this.card_placement.empty() ? null : this.card_placement.peek();
@@ -272,11 +270,11 @@ class OneGame {
                 if (card == null || !player_card_group.contains(card)) {
                     this.gameStatus = GameStatus.READY;
                     this.turn = turn_bak;
-                    turn_lock.unlock();
                     return new Tuple<Boolean, String, String>(false, "非法操作", new String());
                 }
 
                 this.card_placement.push(card);
+                player_card_group.remove(card);
 
             /*
               if types of new card and card on old top is the same,
@@ -301,7 +299,7 @@ class OneGame {
                 id = (this.turn + 1) % 2;
                 id_string = id == 0 ? "P1" : "P2";
 
-                String code = id + " 0 " + card;
+                String code = id + " 1 " + card;
                 String msg = id_string + " " + op_string + " " + card;
                 if (res != null) msg += res;
 
@@ -312,7 +310,6 @@ class OneGame {
                 String[] timestr = this.updated_at.split(" ");
                 this.updated_at = timestr[0] + "T" + timestr[1] + "Z";
 
-                turn_lock.unlock();
                 return new Tuple<Boolean, String, String>(true, code, msg);
             }
         } finally {
@@ -617,7 +614,7 @@ public class LocalServer extends RouterNanoHTTPD {
                 int id = LocalServer.playerList.get(token);
 
                 try {
-                    if (game.getGameStatus() == GameStatus.PLAYING || game.getGameStatus() == GameStatus.OVER) {
+                    if (game.getGameStatus() == GameStatus.PLAYING) {
                         Tuple<String, String, Integer> last = game.getLast();
 
                         JSONObject res = new JSONObject();
@@ -638,6 +635,9 @@ public class LocalServer extends RouterNanoHTTPD {
                         res.put("msg", "操作成功");
 
                         return NanoHTTPD.newFixedLengthResponse(game.getGameStatus() == GameStatus.PLAYING ? Response.Status.OK : Response.Status.UNAUTHORIZED, getMimeType(), res.toString());
+                    } else if (game.getGameStatus() == GameStatus.OVER) {
+                        String msg = "{\"code\":400,\"data\":{\"err_msg\":\"对局已结束\"}, \"msg\":\"鉴权失败\"}";
+                        return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), msg);
                     } else if (game.getGameStatus() == GameStatus.READY) {
                         String msg = "{\"code\":200,\"data\":{\"last_code\":\"\", \"last_msg\": \"对局刚开始\", \"your_turn\": true}, \"msg\":\"操作成功\"}";
                         return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), msg);
@@ -826,8 +826,8 @@ public class LocalServer extends RouterNanoHTTPD {
                         e.printStackTrace();
                     }
                 } else if (game.getGameStatus() == GameStatus.OVER) {
-                    String msg = "{\"code\":401,\"data\":{\"err_msg\":\"对局已结束\"}, \"msg\":\"鉴权失败\"}";
-                    return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
+                    String msg = "{\"code\":400,\"data\":{\"err_msg\":\"对局已结束\"}, \"msg\":\"鉴权失败\"}";
+                    return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, getMimeType(), msg);
                 } else if (game.getGameStatus() == GameStatus.WAITING) {
                     String msg = "{\"code\":403,\"data\":{\"err_msg\":\"人还没齐\"}, \"msg\":\"非法操作\"}";
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.FORBIDDEN, getMimeType(), msg);
