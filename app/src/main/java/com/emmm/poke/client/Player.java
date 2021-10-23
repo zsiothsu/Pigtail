@@ -286,8 +286,8 @@ public class Player {
     Object ret_value = null;
 
     OkHttpClient client = new OkHttpClient().newBuilder()
-        .readTimeout(10, TimeUnit.SECONDS)
-        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(7, TimeUnit.SECONDS)
+        .connectTimeout(7, TimeUnit.SECONDS)
         .build();
 
     /******************************************

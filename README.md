@@ -9,3 +9,15 @@ PigTail is a poke game with simple rules. You can play with just a deck of cards
 - A fast, resource-saving and intelligent AI System
 - Can set up a local server
 - Play on cloud server
+
+## Building
+
+### Android Studio
+Open the project with Android Studio,and push `Build->Make Project`.
+
+### command line:
+Execute this command in the root directory:
+```shell
+ ./gradlew app:build
+```
+The first build will take some time. Output apk file is in `build/outputs/apk/release/`
