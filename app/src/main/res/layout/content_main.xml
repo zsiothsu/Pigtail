@@ -1,19 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-    <fragment
-        android:id="@+id/nav_host_fragment_content_main"
-        android:name="androidx.navigation.fragment.NavHostFragment"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        app:defaultNavHost="true"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:navGraph="@navigation/nav_graph" />
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        >
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="70dp">
+
+        <ImageView
+            android:id="@+id/imageView3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_u17"
+            tools:ignore="MissingConstraints" />
+
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="230dp"
+            android:layout_height="71dp"
+            android:layout_marginLeft="5dp"
+            android:layout_marginTop="20dp"
+            android:text="豬尾巴之戰"
+            android:textAppearance="@style/TextAppearance.AppCompat.Large"
+            android:textSize="40sp"
+            android:typeface="serif"
+            tools:ignore="MissingConstraints" />
+
+    </LinearLayout>
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="100dp"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/Button_TwoPlayer"
+                android:layout_width="300dp"
+                android:layout_height="60dp"
+                android:layout_centerHorizontal="true"
+                android:background="#00BCD4"
+                android:text="人人对战"
+                android:textSize="18dp" />
+
+            <Button
+                android:id="@+id/Button_AIPlayer"
+                android:layout_width="300dp"
+                android:layout_height="60dp"
+                android:layout_below="@+id/Button_TwoPlayer"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="50px"
+                android:background="#A1D1CB"
+                android:text="人机对战"
+                android:textSize="18dp" />
+
+            <Button
+                android:id="@+id/Button_MultiPlayer"
+                android:layout_width="300dp"
+                android:layout_height="60dp"
+                android:layout_below="@+id/Button_AIPlayer"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="50px"
+                android:background="#1F524B"
+                android:text="联机对战"
+                android:textSize="18dp" />
+
+            <Button
+                android:id="@+id/Button_Quit"
+                android:layout_width="300dp"
+                android:layout_height="60dp"
+                android:layout_below="@+id/Button_MultiPlayer"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="50px"
+                android:background="#7EA39E"
+                android:text="退出游戏"
+                android:textSize="18dp" />
+
+        </RelativeLayout>
+
+        <Button
+            android:id="@+id/Button_help"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentBottom="true"
+            android:layout_marginLeft="10dp"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/ic_u21" />
+    </RelativeLayout>
+
+
+
 </androidx.constraintlayout.widget.ConstraintLayout>

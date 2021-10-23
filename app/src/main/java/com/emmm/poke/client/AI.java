@@ -10,7 +10,8 @@ import android.os.Debug;
 
 public class AI {
     Player player;
-    boolean status;
+    public boolean status;
+    Thread AI_Thread;
 
     public AI(Player player) {
         this.player = player;
@@ -18,6 +19,27 @@ public class AI {
 
     public void enable() {
         status = true;
+        AI_Thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (status) {
+                    try {
+                        while (!player.getLast()) {
+                            Thread.sleep(2);
+                            if(player.isGameOver()) return;
+                        }
+                        Thread.sleep(500);
+                        player.ai.active();
+                        if(player.isGameOver()) return;
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                return;
+            }
+        }, "AI_Thread_"+player.host);
+
+        AI_Thread.start();
     }
 
     public void disable() {

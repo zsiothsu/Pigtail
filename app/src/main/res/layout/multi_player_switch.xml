@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="150dp">
+
+            <TextView
+                android:id="@+id/server_switch_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="30dp"
+                android:text="服务器选择"
+                android:textSize="20dp"
+                android:textStyle="bold" />
+
+            <RadioGroup
+                android:id="@+id/server_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/server_switch_text"
+                android:layout_centerHorizontal="true">
+
+                <RadioButton
+                    android:id="@+id/Button_school_server"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="校园网服务器"
+                    android:textSize="30dp" />
+
+                <RadioButton
+                    android:id="@+id/Button_local_server"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="局域网服务器"
+                    android:textSize="30dp" />
+
+            </RadioGroup>
+
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_marginBottom="150dp">
+
+            <Button
+                android:id="@+id/Button_new_game"
+                android:layout_width="300dp"
+                android:layout_height="50dp"
+                android:layout_centerHorizontal="true"
+                android:background="#3291D9"
+                android:text="创建新游戏"
+                android:textSize="25dp" />
+
+            <Button
+                android:id="@+id/Button_join_game"
+                android:layout_width="300dp"
+                android:layout_height="50dp"
+                android:layout_below="@+id/Button_new_game"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="47dp"
+                android:background="#3291D9"
+                android:text="加入服务器"
+                android:textSize="25dp" />
+
+        </RelativeLayout>
+
+    </RelativeLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

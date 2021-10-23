@@ -15,9 +15,11 @@ import java.util.Date;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import okhttp3.Call;
 import okhttp3.FormBody;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -93,10 +95,10 @@ class OneGame_Simple {
     /**
      * do an operation: put a card or turn over from card group
      *
-     * @param host player order, 0: host  1:guest
+     * @param host  player order, 0: host  1:guest
      * @param order own order.
-     * @param op   game operation
-     * @param card card put or turned over
+     * @param op    game operation
+     * @param card  card put or turned over
      * @return Tuple.first: isSuccess
      * Tuple.second: code likes '0 0 H7'
      * Tuple.third: full log message
@@ -166,8 +168,8 @@ class OneGame_Simple {
             }
 
             if (this.card_group <= 0) {
-                if (this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 0;
-                else if (this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 1;
+                if (this.card_at_p1.size() < this.card_at_p2.size()) this.winner = 0;
+                else if (this.card_at_p1.size() > this.card_at_p2.size()) this.winner = 1;
                 else this.winner = -1;
                 this.finished = true;
             }
@@ -188,7 +190,7 @@ class OneGame_Simple {
             this.card_placement.push(card);
             player_card_group.remove(card);
 
-            if(host == order) {
+            if (host == order) {
                 char type = card.charAt(0);
                 switch (type) {
                     case 'S':
@@ -259,7 +261,7 @@ public class Player {
     public String server_game_ip = null;
     public int server_game_port = -1;
 
-    private String token = null;
+    public String token = null;
     public String uuid;
     public int host = 0;
 
@@ -281,6 +283,8 @@ public class Player {
     /* waiting for network thread to return */
     private final Semaphore semaphore = new Semaphore(0, true);
     Object ret_value = null;
+
+    OkHttpClient client = new OkHttpClient().newBuilder().readTimeout(10, TimeUnit.SECONDS).build();
 
     /******************************************
      *                 game                   *
@@ -337,6 +341,7 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted.
      */
     public boolean login() throws InterruptedException {
+        ret_value = null;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -350,7 +355,6 @@ public class Player {
                     String url = "http://" + server_login_ip + ":" + server_login_port + "/api/user/login/";
                     String urlParam = "student_id=" + username + "&password=" + password;
 
-                    OkHttpClient client = new OkHttpClient();
 
                     FormBody.Builder formBody = new FormBody.Builder();
                     formBody.add("student_id", username)
@@ -382,6 +386,8 @@ public class Player {
                         ret_value = false;
                     }
 
+                    response.close();
+                    response = null;
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -394,6 +400,7 @@ public class Player {
 
         /* waiting for network thread to return */
         semaphore.acquire();
+        System.gc();
         return (boolean) ret_value;
     }
 
@@ -406,6 +413,7 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public String createGame(boolean priv) throws InterruptedException {
+        ret_value = null;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -421,7 +429,6 @@ public class Player {
                     String urlParam = priv ? "{\"private\":true}" : "{\"private\":false}";
                     MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-                    OkHttpClient client = new OkHttpClient();
                     RequestBody body = RequestBody.create(JSON, urlParam);
                     Request request = new Request.Builder()
                         .url(url)
@@ -449,6 +456,9 @@ public class Player {
                     else {
                         ret_value = null;
                     }
+
+                    response.close();
+                    response = null;
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -461,6 +471,7 @@ public class Player {
 
         /* waiting for network thread to return */
         semaphore.acquire();
+        System.gc();
         return (String) ret_value;
     }
 
@@ -473,6 +484,7 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public boolean joinGame(String _uuid) throws InterruptedException {
+        ret_value = null;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -486,7 +498,6 @@ public class Player {
 
                     String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + _uuid;
 
-                    OkHttpClient client = new OkHttpClient();
                     Request request = new Request.Builder()
                         .url(url)
                         .addHeader("Authorization", token)
@@ -506,6 +517,8 @@ public class Player {
                         ret_value = false;
                     }
 
+                    response.close();
+                    response = null;
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -518,6 +531,7 @@ public class Player {
 
         /* waiting for network thread to return */
         semaphore.acquire();
+        System.gc();
         return (boolean) ret_value;
     }
 
@@ -533,6 +547,7 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public Tuple<Boolean, String, String> operate(GameOperation op, String card) throws InterruptedException {
+        ret_value = null;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -551,7 +566,6 @@ public class Player {
 
                     MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-                    OkHttpClient client = new OkHttpClient();
                     RequestBody body = RequestBody.create(JSON, urlParam);
                     Request request = new Request.Builder()
                         .url(url)
@@ -578,6 +592,8 @@ public class Player {
                         ret_value = new Tuple<Boolean, String, String>(false, "请求超时", "");
                     }
 
+                    response.close();
+                    response = null;
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -588,6 +604,7 @@ public class Player {
         }, "Thread_operate").start();
 
         semaphore.acquire();
+        System.gc();
         return (Tuple<Boolean, String, String>) ret_value;
     }
 
@@ -601,10 +618,9 @@ public class Player {
      */
     public boolean getLast() throws InterruptedException {
         llock.lock();
-        ret_value = null;
         try {
-            Thread.sleep(5);
-            new Thread(new Runnable() {
+            ret_value = null;
+            Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     lock.lock();
@@ -616,80 +632,94 @@ public class Player {
 
                         String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid + "/last";
 
-                        OkHttpClient client = new OkHttpClient();
                         Request request = new Request.Builder()
                             .url(url)
                             .addHeader("Authorization", token)
+                            .addHeader("Connection", "close")
                             .get()
                             .build();
-                        Response response = client.newCall(request).execute();
+                        try (Response response = client.newCall(request).execute()) {
 
-                        /* game is playing or over */
-                        if (response.isSuccessful() || response.code() == 400) {
-                            String res = response.body().string();
-                            JSONObject json = new JSONObject(res);
-                            JSONObject data = json.getJSONObject("data");
+                            /* game is playing or over */
+                            if (response.isSuccessful() || response.code() == 400) {
+                                String res = response.body().string();
+                                JSONObject json = new JSONObject(res);
+                                JSONObject data = json.getJSONObject("data");
 
-                            if (json.getInt("code") == 200) {
-                                String last_code = data.getString("last_code");
-                                boolean your_turn = data.getBoolean("your_turn");
+                                if (json.getInt("code") == 200) {
+                                    String last_code = data.getString("last_code");
+                                    boolean your_turn = data.getBoolean("your_turn");
 
-                                /* perform the player's steps in the locally stored game */
-                                String[] code = last_code.trim().split(" ");
-                                if (last_code.length() != 0 && (
-                                    /* game is just begin */
-                                    game.log_msg.isEmpty() || (
-                                        /* block duplicate steps */
-                                        !game.log.isEmpty() && !game.log.lastElement().equals(last_code))
-                                )
-                                ) {
-                                    if (code[1].equals("0")) {
-                                        game.operate(Integer.parseInt(code[0]), host, GameOperation.turnOver, code[2]);
-                                    } else {
-                                        game.operate(Integer.parseInt(code[0]), host, GameOperation.putCard, code[2]);
-                                    }
-                                }
-                                ret_value = your_turn;
-                            }
-
-                            if (json.getInt("code") == 400) {
-                                Log.v("code", "400end");
-
-                                if(game.card_group == 1) {
-                                    int base = 0;
-                                    if(game.rest_S == 1) base = 0;
-                                    else if(game.rest_H == 1) base = 13;
-                                    else if(game.rest_C == 1) base = 26;
-                                    else if(game.rest_D ==1 ) base = 39;
-
-                                    for(int i =  base ; i < base + 13;i++) {
-                                        String final_card = OneGame_Simple.card_new[i];
-                                        if(!game.card_at_p1.contains(final_card) &&
-                                           !game.card_at_p2.contains(final_card) &&
-                                           !game.card_placement.contains(final_card)) {
-                                            game.operate((host+1) % 2, host, GameOperation.turnOver, final_card);
-                                            break;
+                                    /* perform the player's steps in the locally stored game */
+                                    String[] code = last_code.trim().split(" ");
+                                    if (last_code.length() != 0 && (
+                                        /* game is just begin */
+                                        game.log_msg.isEmpty() || (
+                                            /* block duplicate steps */
+                                            !game.log.isEmpty() && !game.log.lastElement().equals(last_code))
+                                    )
+                                    ) {
+                                        if (code[1].equals("0")) {
+                                            game.operate(Integer.parseInt(code[0]), host, GameOperation.turnOver, code[2]);
+//                                        game.operate((host + 1 % 2), host, GameOperation.turnOver, code[2]);
+                                        } else {
+                                            game.operate(Integer.parseInt(code[0]), host, GameOperation.putCard, code[2]);
+//                                        game.operate((host + 1 % 2), host, GameOperation.putCard, code[2]);
                                         }
                                     }
+                                    ret_value = your_turn;
                                 }
-                                ret_value = true;
-                            }
 
-                        } else {
-                            ret_value = false;
+                            /*
+                               for the server will not return last code if game is over,
+                               we should find out which card was turned over
+                             */
+                                if (json.getInt("code") == 400) {
+                                    Log.v("code", "400end");
+
+                                    if (game.card_group == 1) {
+                                        int base = 0;
+                                        if (game.rest_S == 1) base = 0;
+                                        else if (game.rest_H == 1) base = 13;
+                                        else if (game.rest_C == 1) base = 26;
+                                        else if (game.rest_D == 1) base = 39;
+
+                                        /* final card must be not in placement or player's card */
+                                        for (int i = base; i < base + 13; i++) {
+                                            String final_card = OneGame_Simple.card_new[i];
+                                            if (!game.card_at_p1.contains(final_card) &&
+                                                !game.card_at_p2.contains(final_card) &&
+                                                !game.card_placement.contains(final_card)) {
+                                                game.operate((host + 1) % 2, host, GameOperation.turnOver, final_card);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    ret_value = true;
+                                }
+
+                            } else {
+                                ret_value = false;
+                            }
+                            response.body().close();
+                        } finally {
+
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
                     } finally {
                         lock.unlock();
                         semaphore.release();
+                        System.gc();
                     }
                 }
-            }, "Thread_getLast").start();
+            }, "Thread_getLast");
 
+            thread.start();
             semaphore.acquire();
-            if (ret_value == null) return false;
-            return (boolean) ret_value;
+            thread.interrupt();
+            System.gc();
+            return ret_value == null ? false : (boolean) ret_value;
         } finally {
             llock.unlock();
         }
@@ -722,8 +752,10 @@ public class Player {
                 ) {
                     if (code[1].equals("0")) {
                         game.operate(Integer.parseInt(code[0]), host, GameOperation.turnOver, code[2]);
+//                        game.operate(host, host, GameOperation.turnOver, code[2]);
                     } else {
                         game.operate(Integer.parseInt(code[0]), host, GameOperation.putCard, code[2]);
+//                        game.operate(host, host, GameOperation.putCard, code[2]);
                     }
                 }
             }
@@ -750,10 +782,38 @@ public class Player {
      * @return true: win
      * false: lose or draw
      */
-    public boolean winner() {
+    public boolean isWinner() {
         if (isGameOver()) {
             return this.host == game.winner;
         }
         return false;
+    }
+
+    public int getWinner() {
+        return game.winner;
+    }
+
+    public Vector<String> get_card_host() {
+        return game.card_at_p1;
+    }
+
+    public Vector<String> get_card_guest() {
+        return game.card_at_p2;
+    }
+
+    public String get_top_card() {
+        return game.card_placement.isEmpty() ? null : game.card_placement.peek();
+    }
+
+    public boolean get_card_group() {
+        return game.card_group != 0;
+    }
+
+    public String get_msg() {
+        return game.log_msg.isEmpty() ? new String() : game.log_msg.lastElement();
+    }
+
+    public void __createGame() {
+        game = new OneGame_Simple();
     }
 }

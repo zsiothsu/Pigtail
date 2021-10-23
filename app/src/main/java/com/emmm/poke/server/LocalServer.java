@@ -651,7 +651,6 @@ public class LocalServer extends RouterNanoHTTPD {
 
                 return NanoHTTPD.newChunkedResponse(getStatus(), getMimeType(), getData());
             }
-
             return NanoHTTPD.newChunkedResponse(getStatus(), getMimeType(), getData());
         }
     }

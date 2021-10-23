@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@mipmap/u43">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:layout_centerHorizontal="true">
+
+            <RelativeLayout
+                android:id="@+id/card_group"
+                android:layout_width="80dp"
+                android:layout_height="100dp"
+                android:background="#FFFFFF">
+
+                <TextView
+                    android:id="@+id/card_group_num"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerInParent="true"
+                    android:textSize="50dp"
+                    android:textStyle="bold" />
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/card_placement"
+                android:layout_width="80dp"
+                android:layout_height="100dp"
+                android:background="#FFFFFF"
+                android:layout_toRightOf="@id/card_group"
+                android:layout_marginLeft="10dp">
+
+                <TextView
+                    android:id="@+id/card_placement_num1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentTop="true"
+                    android:text=""
+                    android:textSize="30dp" />
+
+                <ImageView
+                    android:id="@+id/card_placement_img"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_centerInParent="true" />
+
+                <TextView
+                    android:id="@+id/card_placement_num2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true"
+                    android:layout_alignParentBottom="true"
+                    android:text=""
+                    android:textSize="30dp" />
+
+            </RelativeLayout>
+
+        </RelativeLayout>
+
+        <LinearLayout
+            android:id="@+id/P1_card"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:alpha="0.7"
+            android:background="#E9E9E9"
+            android:layout_alignParentBottom="true">
+
+            <RelativeLayout
+                android:id="@+id/P1cardS"
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+                <RelativeLayout
+                    android:layout_width="80dp"
+                    android:layout_height="100dp"
+                    android:background="#FFFFFF"
+                    android:layout_centerInParent="true">
+
+                    <TextView
+                        android:id="@+id/P1_spade_num1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentLeft="true"
+                        android:layout_alignParentTop="true"
+                        android:text="0"
+                        android:textSize="30dp" />
+
+                    <ImageView
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:layout_centerInParent="true"
+                        android:src="@drawable/spade" />
+
+                    <TextView
+                        android:id="@+id/P1_spade_num2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentRight="true"
+                        android:layout_alignParentBottom="true"
+                        android:text="0"
+                        android:textSize="30dp" />
+
+                </RelativeLayout>
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+                <RelativeLayout
+                    android:id="@+id/P1cardH"
+                    android:layout_width="80dp"
+                    android:layout_height="100dp"
+                    android:background="#FFFFFF">
+
+                    <TextView
+                        android:id="@+id/P1_heart_num1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentLeft="true"
+                        android:layout_alignParentTop="true"
+                        android:text="0"
+                        android:textSize="30dp"/>
+
+                    <ImageView
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:layout_centerInParent="true"
+                        android:src="@drawable/heart" />
+
+                    <TextView
+                        android:id="@+id/P1_heart_num2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentRight="true"
+                        android:layout_alignParentBottom="true"
+                        android:text="0"
+                        android:textSize="30dp" />
+
+                </RelativeLayout>
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+                <RelativeLayout
+                    android:id="@+id/P1cardC"
+                    android:layout_width="80dp"
+                    android:layout_height="100dp"
+                    android:background="#FFFFFF">
+
+                    <TextView
+                        android:id="@+id/P1_club_num1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentLeft="true"
+                        android:layout_alignParentTop="true"
+                        android:text="0"
+                        android:textSize="30dp" />
+
+                    <ImageView
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:layout_centerInParent="true"
+                        android:src="@drawable/club" />
+
+                    <TextView
+                        android:id="@+id/P1_club_num2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentRight="true"
+                        android:layout_alignParentBottom="true"
+                        android:text="0"
+                        android:textSize="30dp" />
+
+                </RelativeLayout>
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+                <RelativeLayout
+                    android:id="@+id/P1cardD"
+                    android:layout_width="80dp"
+                    android:layout_height="100dp"
+                    android:background="#FFFFFF">
+
+                    <TextView
+                        android:id="@+id/P1_diamond_num1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentLeft="true"
+                        android:layout_alignParentTop="true"
+                        android:text="0"
+                        android:textSize="30dp" />
+
+                    <ImageView
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:layout_centerInParent="true"
+                        android:src="@drawable/diamond" />
+
+                    <TextView
+                        android:id="@+id/P1_diamond_num2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentRight="true"
+                        android:layout_alignParentBottom="true"
+                        android:text="0"
+                        android:textSize="30dp" />
+
+                </RelativeLayout>
+            </RelativeLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_alignParentTop="true"
+            android:id="@+id/P2_card"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:alpha="0.7"
+            android:background="#E9E9E9">
+
+            <RelativeLayout
+                android:id="@+id/P2cardS"
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+            <RelativeLayout
+                android:layout_width="80dp"
+                android:layout_height="100dp"
+                android:background="#FFFFFF"
+                android:layout_centerInParent="true">
+
+                <TextView
+                    android:id="@+id/P2_spade_num1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentTop="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+                <ImageView
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_centerInParent="true"
+                    android:src="@drawable/spade" />
+
+                <TextView
+                    android:id="@+id/P2_spade_num2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true"
+                    android:layout_alignParentBottom="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+            </RelativeLayout>
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+            <RelativeLayout
+                android:id="@+id/P2cardH"
+                android:layout_width="80dp"
+                android:layout_height="100dp"
+                android:background="#FFFFFF">
+
+                <TextView
+                    android:id="@+id/P2_heart_num1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentTop="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+                <ImageView
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_centerInParent="true"
+                    android:src="@drawable/heart" />
+
+                <TextView
+                    android:id="@+id/P2_heart_num2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true"
+                    android:layout_alignParentBottom="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+            </RelativeLayout>
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+            <RelativeLayout
+                android:id="@+id/P2cardC"
+                android:layout_width="80dp"
+                android:layout_height="100dp"
+                android:background="#FFFFFF">
+
+                <TextView
+                    android:id="@+id/P2_club_num1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentTop="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+                <ImageView
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_centerInParent="true"
+                    android:src="@drawable/club" />
+
+                <TextView
+                    android:id="@+id/P2_club_num2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true"
+                    android:layout_alignParentBottom="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+            </RelativeLayout>
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1">
+            <RelativeLayout
+                android:id="@+id/P2cardD"
+                android:layout_width="80dp"
+                android:layout_height="100dp"
+                android:background="#FFFFFF">
+
+                <TextView
+                    android:id="@+id/P2_diamond_num1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentTop="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+                <ImageView
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_centerInParent="true"
+                    android:src="@drawable/diamond" />
+
+                <TextView
+                    android:id="@+id/P2_diamond_num2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true"
+                    android:layout_alignParentBottom="true"
+                    android:text="0"
+                    android:textSize="30dp" />
+
+            </RelativeLayout>
+            </RelativeLayout>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/Button_AIP2"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_below="@+id/P2_card"
+            android:layout_alignParentLeft="true"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/ic_ai"
+            android:drawableTint="#FFFFFF" />
+
+        <Button
+            android:id="@+id/Button_AIP1"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_above="@+id/P1_card"
+            android:layout_alignParentLeft="true"
+            android:layout_marginBottom="5dp"
+            android:background="@drawable/ic_ai"
+            android:drawableTint="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/Text_P1_AIStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/P1_card"
+            android:layout_toRightOf="@id/Button_AIP1"
+            android:text="AI OFF"
+            android:textColor="#FFFFFF"
+            android:textSize="20dp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/Text_P2_AIStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AI OFF"
+            android:textColor="#FFFFFF"
+            android:textSize="20dp"
+            android:textStyle="bold"
+            android:layout_toRightOf="@id/Button_AIP2"
+            android:layout_below="@id/P2_card"
+            />
+
+        <TextView
+            android:id="@+id/msg_box"
+            android:layout_width="200dp"
+            android:layout_height="110dp"
+            android:layout_below="@id/P2_card"
+            android:layout_alignParentRight="true"
+            android:layout_marginTop="20dp"
+            android:background="#EFEFEF"
+            android:padding="10dp"
+            android:text="讯息"
+            android:textSize="20dp" />
+
+
+    </RelativeLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
