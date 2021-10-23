@@ -25,7 +25,7 @@ public class AI {
                 while (status) {
                     try {
                         while (!player.getLast()) {
-                            Thread.sleep(2);
+                            Thread.sleep(1000);
                             if(player.isGameOver()) return;
                         }
                         Thread.sleep(500);

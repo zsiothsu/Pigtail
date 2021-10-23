@@ -1,6 +1,8 @@
 package com.emmm.poke;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
@@ -16,11 +18,15 @@ import com.emmm.poke.client.Player;
 import com.emmm.poke.databinding.CreateGameBinding;
 import com.emmm.poke.databinding.JoinGameBinding;
 
+import java.util.Vector;
+
 public class JoinGameActivity extends Activity {
 
     JoinGameBinding binding;
     char server_mode = 'N';
 
+    Vector<String> game_list;
+    int choice;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -100,6 +106,69 @@ public class JoinGameActivity extends Activity {
 
                 } catch (InterruptedException e) {
                     e.printStackTrace();
+                }
+            }
+        });
+
+        Button Button_search = findViewById(R.id.Button_search);
+        Button_search.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                EditText Text_username = findViewById(R.id.Text_join_username);
+                EditText Text_join_password = findViewById(R.id.Text_join_password);
+                EditText Text_server_ip = findViewById(R.id.Text_server_ip);
+
+                String username = Text_username.getText().toString();
+                String password = Text_join_password.getText().toString();
+                String server_ip = Text_server_ip.getText().toString();
+
+                Player player = new Player(username, password);
+
+                if (server_mode == 'S') {
+                    player.setLoginServer("172.17.173.97", 8080);
+                    player.setGameServer("172.17.173.97", 9000);
+                } else {
+                    player.setLoginServer(server_ip, 9000);
+                    player.setGameServer(server_ip, 9000);
+                }
+
+                try {
+                    boolean status = player.login();
+
+                    if (status) {
+                        game_list = player.gameList();
+
+                        AlertDialog.Builder uuid_choose = new AlertDialog.Builder(JoinGameActivity.this);
+                        uuid_choose.setTitle("游戏列表");
+
+
+                        uuid_choose.setSingleChoiceItems(game_list.toArray(new String[0]), 0, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                choice = which;
+                            }
+                        });
+
+                        uuid_choose.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                if (choice != -1) {
+                                    EditText Text_uuid = findViewById(R.id.Text_uuid);
+                                    Text_uuid.setText(game_list.get(choice));
+                                }
+                            }
+                        });
+
+                        uuid_choose.show();
+                    }
+                    else {
+                        TextView msg = findViewById(R.id.Text_join_msg_box);
+                        msg.setText("登录失败，请检查用户名和密码");
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+
                 }
             }
         });

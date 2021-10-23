@@ -4,6 +4,7 @@ import android.util.Log;
 
 import com.emmm.poke.utils.*;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -284,7 +285,10 @@ public class Player {
     private final Semaphore semaphore = new Semaphore(0, true);
     Object ret_value = null;
 
-    OkHttpClient client = new OkHttpClient().newBuilder().readTimeout(10, TimeUnit.SECONDS).build();
+    OkHttpClient client = new OkHttpClient().newBuilder()
+        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .build();
 
     /******************************************
      *                 game                   *
@@ -401,7 +405,7 @@ public class Player {
         /* waiting for network thread to return */
         semaphore.acquire();
         System.gc();
-        return (boolean) ret_value;
+        return ret_value != null && (boolean) ret_value;
     }
 
     /**
@@ -532,7 +536,7 @@ public class Player {
         /* waiting for network thread to return */
         semaphore.acquire();
         System.gc();
-        return (boolean) ret_value;
+        return ret_value != null && (boolean) ret_value;
     }
 
     /**
@@ -547,7 +551,7 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public Tuple<Boolean, String, String> operate(GameOperation op, String card) throws InterruptedException {
-        ret_value = null;
+        ret_value = new Tuple<Boolean, String, String>(false, new String(), new String());
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -638,7 +642,8 @@ public class Player {
                             .addHeader("Connection", "close")
                             .get()
                             .build();
-                        try (Response response = client.newCall(request).execute()) {
+                        Response response = client.newCall(request).execute();
+                        try {
 
                             /* game is playing or over */
                             if (response.isSuccessful() || response.code() == 400) {
@@ -764,6 +769,87 @@ public class Player {
         } finally {
             plock.unlock();
         }
+    }
+
+    public Vector<String> gameList() throws InterruptedException {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                lock.lock();
+                try {
+                    ret_value = null;
+                    if (server_game_ip == null || server_game_port == -1 || token == null) {
+                        ret_value = new Tuple<Boolean, String, String>(false, "", "");
+                        return;
+                    }
+
+                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/index"
+                        + "?page_size=10&page_num=1";
+
+                    Request request = new Request.Builder()
+                        .url(url)
+                        .addHeader("Authorization", token)
+                        .addHeader("Connection", "close")
+                        .get()
+                        .build();
+                    Response response = client.newCall(request).execute();
+
+                    /*
+                       200/OK: success
+                       403/FORBIDDEN: game is waiting or error operation
+                     */
+                    if (response.isSuccessful()) {
+                        String res = response.body().string();
+                        JSONObject json = new JSONObject(res);
+                        JSONObject data = json.getJSONObject("data");
+                        int tot = data.getInt("total_page_num");
+
+                        url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/index"
+                            + "?page_size=10&page_num=" + tot;
+
+                        request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .addHeader("Connection", "close")
+                            .get()
+                            .build();
+
+                        response = client.newCall(request).execute();
+
+                        Vector<String> glist = new Vector<String>();
+
+                        if (response.isSuccessful()) {
+                            res = response.body().string();
+                            json = new JSONObject(res);
+                            data = json.getJSONObject("data");
+                            JSONArray list = data.getJSONArray("games");
+
+                            for (int i = 0; i < list.length(); i++) {
+                                JSONObject _game = list.getJSONObject(i);
+                                glist.add(_game.getString("uuid"));
+                            }
+                        }
+
+                        ret_value = glist;
+                    } else {
+                        ret_value = new Vector<String>();
+                    }
+
+                    response.close();
+                    response = null;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
+                    semaphore.release();
+                }
+            }
+        }, "Thread_gameList").start();
+
+        semaphore.acquire();
+        System.gc();
+        return (Vector<String>)ret_value;
     }
 
     /**

@@ -67,7 +67,7 @@ public class player_with_remote extends Activity {
 
         PA = new Player(username, password);
         PA.setLoginServer(serverip, login_port);
-        PA.setGameServer(serverip, login_port);
+        PA.setGameServer(serverip, game_port);
         PA.token = token;
         PA.uuid = uuid;
 
@@ -108,7 +108,7 @@ public class player_with_remote extends Activity {
                         return;
                     }
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(3000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -139,6 +139,9 @@ public class player_with_remote extends Activity {
 
         thread_active = true;
         flush_Thread.start();
+
+        t = findViewById(R.id.Text_P2_AIStatus);
+        t.setText("REMOTE PLAYER");
 
         dialog.show();
     }

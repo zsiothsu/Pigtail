@@ -72,7 +72,7 @@ class OneGame {
     public String updated_at;
     public String deleted_at;
     public String uuid;
-    public boolean private_status;
+    public boolean private_status = false;
     public boolean finished;
 
     /* player information */
@@ -955,8 +955,8 @@ public class LocalServer extends RouterNanoHTTPD {
                 return NanoHTTPD.newFixedLengthResponse(getStatus(), getMimeType(), getText());
             }
 
-            int page_size = Integer.parseInt(Objects.requireNonNull(urlParams.get("page_size")));
-            int page_num = Integer.parseInt(Objects.requireNonNull(urlParams.get("page_num")));
+            int page_size = Integer.parseInt(session.getParameters().get("page_size").get(0));
+            int page_num = Integer.parseInt(session.getParameters().get("page_num").get(0));
 
             if (page_num <= 0 || page_size * (page_num - 1) > game_public - 1) page_num = 1;
             if (page_size <= 0) page_size = game_public;
@@ -975,7 +975,7 @@ public class LocalServer extends RouterNanoHTTPD {
                 String uuid = game_entry.getKey();
                 OneGame game = game_entry.getValue();
 
-                if (game.private_status = true) continue;
+                if (game.private_status == true) continue;
 
                 if (cnt >= begin && cnt < begin + page_size) {
                     JSONObject new_game = new JSONObject();
@@ -993,8 +993,6 @@ public class LocalServer extends RouterNanoHTTPD {
 
                 cnt++;
             }
-
-            if (cnt == 0) games = null;
 
             try {
                 data.put("games", games)

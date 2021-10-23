@@ -251,6 +251,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentLeft="true"
                     android:layout_alignParentTop="true"
+                    android:rotation="180"
                     android:text="0"
                     android:textSize="30dp" />
 
@@ -258,6 +259,7 @@
                     android:layout_width="60dp"
                     android:layout_height="60dp"
                     android:layout_centerInParent="true"
+                    android:rotation="180"
                     android:src="@drawable/spade" />
 
                 <TextView
@@ -267,6 +269,7 @@
                     android:layout_alignParentRight="true"
                     android:layout_alignParentBottom="true"
                     android:text="0"
+                    android:rotation="180"
                     android:textSize="30dp" />
 
             </RelativeLayout>
@@ -290,12 +293,14 @@
                     android:layout_alignParentLeft="true"
                     android:layout_alignParentTop="true"
                     android:text="0"
+                    android:rotation="180"
                     android:textSize="30dp" />
 
                 <ImageView
                     android:layout_width="60dp"
                     android:layout_height="60dp"
                     android:layout_centerInParent="true"
+                    android:rotation="180"
                     android:src="@drawable/heart" />
 
                 <TextView
@@ -305,6 +310,7 @@
                     android:layout_alignParentRight="true"
                     android:layout_alignParentBottom="true"
                     android:text="0"
+                    android:rotation="180"
                     android:textSize="30dp" />
 
             </RelativeLayout>
@@ -328,12 +334,14 @@
                     android:layout_alignParentLeft="true"
                     android:layout_alignParentTop="true"
                     android:text="0"
+                    android:rotation="180"
                     android:textSize="30dp" />
 
                 <ImageView
                     android:layout_width="60dp"
                     android:layout_height="60dp"
                     android:layout_centerInParent="true"
+                    android:rotation="180"
                     android:src="@drawable/club" />
 
                 <TextView
@@ -343,6 +351,7 @@
                     android:layout_alignParentRight="true"
                     android:layout_alignParentBottom="true"
                     android:text="0"
+                    android:rotation="180"
                     android:textSize="30dp" />
 
             </RelativeLayout>
@@ -366,12 +375,14 @@
                     android:layout_alignParentLeft="true"
                     android:layout_alignParentTop="true"
                     android:text="0"
+                    android:rotation="180"
                     android:textSize="30dp" />
 
                 <ImageView
                     android:layout_width="60dp"
                     android:layout_height="60dp"
                     android:layout_centerInParent="true"
+                    android:rotation="180"
                     android:src="@drawable/diamond" />
 
                 <TextView
@@ -381,6 +392,7 @@
                     android:layout_alignParentRight="true"
                     android:layout_alignParentBottom="true"
                     android:text="0"
+                    android:rotation="180"
                     android:textSize="30dp" />
 
             </RelativeLayout>

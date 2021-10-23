@@ -265,7 +265,6 @@ public class player_with_ai extends Activity {
 
     public void setListener() {
         AIA = findViewById(R.id.Button_AIP1);
-        AIB = findViewById(R.id.Button_AIP2);
 
         AIA.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -277,21 +276,6 @@ public class player_with_ai extends Activity {
                 }
                 else {
                     PA.ai.enable();
-                    t.setText("AI RUNNING");
-                }
-            }
-        });
-
-        AIB.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                TextView t = findViewById(R.id.Text_P2_AIStatus);
-                if (PB.ai.status) {
-                    PB.ai.disable();
-                    t.setText("AI OFF");
-                }
-                else {
-                    PB.ai.enable();
                     t.setText("AI RUNNING");
                 }
             }
@@ -313,9 +297,6 @@ public class player_with_ai extends Activity {
                     if (isP1) {
                         log = PA.operate_update(GameOperation.turnOver, null).third;
                         PB.getLast();
-                    } else if (isP2) {
-                        log = PB.operate_update(GameOperation.turnOver, null).third;
-                        PA.getLast();
                     }
 
                     TextView t = findViewById(R.id.msg_box);
@@ -434,126 +415,6 @@ public class player_with_ai extends Activity {
                                 TextView t = findViewById(R.id.msg_box);
                                 t.setText(log);
                                 PB.getLast();
-                                flush();
-                                break;
-                            }
-                        }
-                    }
-
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-        RelativeLayout Button_P2_card_S = findViewById(R.id.P2cardS);
-        Button_P2_card_S.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (PA.isGameOver()) {
-                    return;
-                }
-                try {
-                    boolean isP2 = PB.getLast();
-                    Vector<String> card = PB.host == 0 ? PB.get_card_host() : PB.get_card_guest();
-                    if (isP2) {
-                        for (String i : card) {
-                            if (i.charAt(0) == 'S') {
-                                String log = PB.operate_update(GameOperation.putCard, i).third;
-                                TextView t = findViewById(R.id.msg_box);
-                                t.setText(log);
-                                PA.getLast();
-                                flush();
-                                break;
-                            }
-                        }
-                    }
-
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-        RelativeLayout Button_P2_card_H = findViewById(R.id.P2cardH);
-        Button_P2_card_H.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (PA.isGameOver()) {
-                    return;
-                }
-                try {
-                    boolean isP2 = PB.getLast();
-                    Vector<String> card = PB.host == 0 ? PB.get_card_host() : PB.get_card_guest();
-                    if (isP2) {
-                        for (String i : card) {
-                            if (i.charAt(0) == 'H') {
-                                String log = PB.operate_update(GameOperation.putCard, i).third;
-                                TextView t = findViewById(R.id.msg_box);
-                                t.setText(log);
-                                PA.getLast();
-                                flush();
-                                break;
-                            }
-                        }
-                    }
-
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-        RelativeLayout Button_P2_card_C = findViewById(R.id.P2cardC);
-        Button_P2_card_C.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (PA.isGameOver()) {
-                    return;
-                }
-                try {
-                    boolean isP2 = PB.getLast();
-                    Vector<String> card = PB.host == 0 ? PB.get_card_host() : PB.get_card_guest();
-                    if (isP2) {
-                        for (String i : card) {
-                            if (i.charAt(0) == 'C') {
-                                String log = PB.operate_update(GameOperation.putCard, i).third;
-                                TextView t = findViewById(R.id.msg_box);
-                                t.setText(log);
-                                PA.getLast();
-                                flush();
-                                break;
-                            }
-                        }
-                    }
-
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-        RelativeLayout Button_P2_card_D = findViewById(R.id.P2cardD);
-        Button_P2_card_D.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (PA.isGameOver()) {
-                    return;
-                }
-                try {
-                    boolean isP2 = PB.getLast();
-                    Vector<String> card = PB.host == 0 ? PB.get_card_host() : PB.get_card_guest();
-                    if (isP2) {
-                        for (String i : card) {
-                            if (i.charAt(0) == 'D') {
-                                String log = PB.operate_update(GameOperation.putCard, i).third;
-                                TextView t = findViewById(R.id.msg_box);
-                                t.setText(log);
-                                PA.getLast();
                                 flush();
                                 break;
                             }
