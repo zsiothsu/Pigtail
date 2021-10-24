@@ -5,14 +5,8 @@ import android.util.Log;
 import com.emmm.poke.utils.*;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.concurrent.Semaphore;
@@ -20,14 +14,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import okhttp3.Call;
 import okhttp3.FormBody;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okio.BufferedSink;
 
 
 /**
@@ -278,9 +270,9 @@ public class Player {
        Semaphore and lock are used for thread control
      */
     /* prevent players from making multiple requests to the server at the same time */
-    private final static Lock lock = new ReentrantLock();
-    private final static Lock plock = new ReentrantLock();
-    private final static Lock llock = new ReentrantLock();
+    private final static Lock http_request_lock = new ReentrantLock();
+    private final static Lock game_operate_lock = new ReentrantLock();
+    private final static Lock ret_value_lock = new ReentrantLock();
     /* waiting for network thread to return */
     private final Semaphore semaphore = new Semaphore(0, true);
     Object ret_value = null;
@@ -345,67 +337,72 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted.
      */
     public boolean login() throws InterruptedException {
-        ret_value = null;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                lock.lock();
-                try {
-                    if (server_login_ip == null || server_login_port == -1) {
-                        ret_value = false;
-                        return;
-                    }
-
-                    String url = "http://" + server_login_ip + ":" + server_login_port + "/api/user/login/";
-                    String urlParam = "student_id=" + username + "&password=" + password;
-
-
-                    FormBody.Builder formBody = new FormBody.Builder();
-                    formBody.add("student_id", username)
-                        .add("password", password);
-
-                    Request request = new Request.Builder()
-                        .url(url)
-                        .post(formBody.build())
-                        .build();
-                    Response response = null;
-
-                    response = client.newCall(request).execute();
-
-                    if (response.isSuccessful()) {
-                        String res = response.body().string();
-                        JSONObject json = new JSONObject(res);
-
-                        /* GET 200/OK, return user token */
-                        if (json.has("status") && json.getInt("status") == 200) {
-                            token = json.getJSONObject("data")
-                                .getString("token");
-                            ret_value = true;
+        ret_value_lock.lock();
+        try {
+            ret_value = null;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    http_request_lock.lock();
+                    try {
+                        if (server_login_ip == null || server_login_port == -1) {
+                            ret_value = false;
+                            return;
                         }
-                        /* return 404/NOT_FOUND， error username or password */
-                        else {
+
+                        String url = "http://" + server_login_ip + ":" + server_login_port + "/api/user/login/";
+                        String urlParam = "student_id=" + username + "&password=" + password;
+
+
+                        FormBody.Builder formBody = new FormBody.Builder();
+                        formBody.add("student_id", username)
+                            .add("password", password);
+
+                        Request request = new Request.Builder()
+                            .url(url)
+                            .post(formBody.build())
+                            .build();
+                        Response response = null;
+
+                        response = client.newCall(request).execute();
+
+                        if (response.isSuccessful()) {
+                            String res = response.body().string();
+                            JSONObject json = new JSONObject(res);
+
+                            /* GET 200/OK, return user token */
+                            if (json.has("status") && json.getInt("status") == 200) {
+                                token = json.getJSONObject("data")
+                                    .getString("token");
+                                ret_value = true;
+                            }
+                            /* return 404/NOT_FOUND， error username or password */
+                            else {
+                                ret_value = false;
+                            }
+                        } else {
                             ret_value = false;
                         }
-                    } else {
-                        ret_value = false;
+
+                        response.close();
+                        response = null;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        /* unlock thread, tell main thread that result is ready */
+                        http_request_lock.unlock();
+                        semaphore.release();
                     }
-
-                    response.close();
-                    response = null;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    /* unlock thread, tell main thread that result is ready */
-                    lock.unlock();
-                    semaphore.release();
                 }
-            }
-        }, "Thread_login").start();
+            }, "Thread_login").start();
 
-        /* waiting for network thread to return */
-        semaphore.acquire();
-        System.gc();
-        return ret_value != null && (boolean) ret_value;
+            /* waiting for network thread to return */
+            semaphore.acquire();
+            System.gc();
+            return ret_value != null && (boolean) ret_value;
+        } finally {
+            ret_value_lock.unlock();
+        }
     }
 
     /**
@@ -417,66 +414,71 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public String createGame(boolean priv) throws InterruptedException {
-        ret_value = null;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                lock.lock();
-                try {
-                    /* return if user haven't logged in */
-                    if (server_game_ip == null || server_game_port == -1 || token == null) {
-                        ret_value = null;
-                        return;
+        ret_value_lock.lock();
+        try {
+            ret_value = null;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    http_request_lock.lock();
+                    try {
+                        /* return if user haven't logged in */
+                        if (server_game_ip == null || server_game_port == -1 || token == null) {
+                            ret_value = null;
+                            return;
+                        }
+
+                        String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/";
+                        String urlParam = priv ? "{\"private\":true}" : "{\"private\":false}";
+                        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+                        RequestBody body = RequestBody.create(JSON, urlParam);
+                        Request request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .addHeader("Content-Type", "application/json")
+                            .post(body)
+                            .build();
+                        Response response = null;
+
+                        response = client.newCall(request).execute();
+
+                        /* Successfully create a new game */
+                        if (response.isSuccessful()) {
+                            String res = response.body().string();
+                            JSONObject json = new JSONObject(res);
+
+                            uuid = json.getJSONObject("data").getString("uuid");
+                            ret_value = uuid;
+
+                            /* set the player as host */
+                            host = 0;
+                            game = new OneGame_Simple();
+                        }
+                        /* return 401/UNAUTHORIZED */
+                        else {
+                            ret_value = null;
+                        }
+
+                        response.close();
+                        response = null;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        /* unlock thread, tell main thread that result is ready */
+                        http_request_lock.unlock();
+                        semaphore.release();
                     }
-
-                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/";
-                    String urlParam = priv ? "{\"private\":true}" : "{\"private\":false}";
-                    MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-
-                    RequestBody body = RequestBody.create(JSON, urlParam);
-                    Request request = new Request.Builder()
-                        .url(url)
-                        .addHeader("Authorization", token)
-                        .addHeader("Content-Type", "application/json")
-                        .post(body)
-                        .build();
-                    Response response = null;
-
-                    response = client.newCall(request).execute();
-
-                    /* Successfully create a new game */
-                    if (response.isSuccessful()) {
-                        String res = response.body().string();
-                        JSONObject json = new JSONObject(res);
-
-                        uuid = json.getJSONObject("data").getString("uuid");
-                        ret_value = uuid;
-
-                        /* set the player as host */
-                        host = 0;
-                        game = new OneGame_Simple();
-                    }
-                    /* return 401/UNAUTHORIZED */
-                    else {
-                        ret_value = null;
-                    }
-
-                    response.close();
-                    response = null;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    /* unlock thread, tell main thread that result is ready */
-                    lock.unlock();
-                    semaphore.release();
                 }
-            }
-        }, "Thread_createGame").start();
+            }, "Thread_createGame").start();
 
-        /* waiting for network thread to return */
-        semaphore.acquire();
-        System.gc();
-        return (String) ret_value;
+            /* waiting for network thread to return */
+            semaphore.acquire();
+            System.gc();
+            return (String) ret_value;
+        } finally {
+            ret_value_lock.unlock();
+        }
     }
 
     /**
@@ -488,55 +490,61 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public boolean joinGame(String _uuid) throws InterruptedException {
-        ret_value = null;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                lock.lock();
-                try {
-                    /* error parameter */
-                    if (server_game_ip == null || server_game_port == -1 || token == null || _uuid == null) {
-                        ret_value = false;
-                        return;
+        ret_value_lock.lock();
+        try {
+
+            ret_value = null;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    http_request_lock.lock();
+                    try {
+                        /* error parameter */
+                        if (server_game_ip == null || server_game_port == -1 || token == null || _uuid == null) {
+                            ret_value = false;
+                            return;
+                        }
+
+                        String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + _uuid;
+
+                        Request request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .post(new FormBody.Builder().build())
+                            .build();
+                        Response response = null;
+                        response = client.newCall(request).execute();
+
+                        if (response.isSuccessful()) {
+                            ret_value = true;
+                            uuid = _uuid;
+
+                            /* set the player as guest */
+                            host = 1;
+                            game = new OneGame_Simple();
+                        } else {
+                            ret_value = false;
+                        }
+
+                        response.close();
+                        response = null;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        /* unlock thread, tell main thread that result is ready */
+                        http_request_lock.unlock();
+                        semaphore.release();
                     }
-
-                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + _uuid;
-
-                    Request request = new Request.Builder()
-                        .url(url)
-                        .addHeader("Authorization", token)
-                        .post(new FormBody.Builder().build())
-                        .build();
-                    Response response = null;
-                    response = client.newCall(request).execute();
-
-                    if (response.isSuccessful()) {
-                        ret_value = true;
-                        uuid = _uuid;
-
-                        /* set the player as guest */
-                        host = 1;
-                        game = new OneGame_Simple();
-                    } else {
-                        ret_value = false;
-                    }
-
-                    response.close();
-                    response = null;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    /* unlock thread, tell main thread that result is ready */
-                    lock.unlock();
-                    semaphore.release();
                 }
-            }
-        }, "Thread_joinGame").start();
+            }, "Thread_joinGame").start();
 
-        /* waiting for network thread to return */
-        semaphore.acquire();
-        System.gc();
-        return ret_value != null && (boolean) ret_value;
+            /* waiting for network thread to return */
+            semaphore.acquire();
+            System.gc();
+            return ret_value != null && (boolean) ret_value;
+        } finally {
+            ret_value_lock.unlock();
+        }
     }
 
     /**
@@ -551,65 +559,71 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public Tuple<Boolean, String, String> operate(GameOperation op, String card) throws InterruptedException {
-        ret_value = new Tuple<Boolean, String, String>(false, new String(), new String());
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                lock.lock();
-                try {
-                    ret_value = null;
-                    if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
-                        ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
-                        return;
-                    }
+        ret_value_lock.lock();
+        try {
 
-                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid;
-                    String urlParam = op == GameOperation.putCard ?
-                        "{\"type\":1, \"card\":\"" + card + "\"}" :
-                        "{\"type\":0}";
+            ret_value = new Tuple<Boolean, String, String>(false, new String(), new String());
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    http_request_lock.lock();
+                    try {
+                        ret_value = null;
+                        if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
+                            ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
+                            return;
+                        }
 
-                    MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+                        String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid;
+                        String urlParam = op == GameOperation.putCard ?
+                            "{\"type\":1, \"card\":\"" + card + "\"}" :
+                            "{\"type\":0}";
 
-                    RequestBody body = RequestBody.create(JSON, urlParam);
-                    Request request = new Request.Builder()
-                        .url(url)
-                        .addHeader("Authorization", token)
-                        .addHeader("Content-Type", "application/json")
-                        .put(body)
-                        .build();
-                    Response response = client.newCall(request).execute();
+                        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+                        RequestBody body = RequestBody.create(JSON, urlParam);
+                        Request request = new Request.Builder()
+                            .url(url)
+                            .addHeader("Authorization", token)
+                            .addHeader("Content-Type", "application/json")
+                            .put(body)
+                            .build();
+                        Response response = client.newCall(request).execute();
 
                     /*
                        200/OK: success
                        403/FORBIDDEN: game is waiting or error operation
                      */
-                    if (response.isSuccessful() || response.code() == 403) {
-                        String res = response.body().string();
-                        JSONObject json = new JSONObject(res);
-                        JSONObject data = json.getJSONObject("data");
+                        if (response.isSuccessful() || response.code() == 403) {
+                            String res = response.body().string();
+                            JSONObject json = new JSONObject(res);
+                            JSONObject data = json.getJSONObject("data");
 
-                        String last_code = data.getString("last_code");
-                        String last_msg = data.getString("last_msg");
+                            String last_code = data.getString("last_code");
+                            String last_msg = data.getString("last_msg");
 
-                        ret_value = new Tuple<Boolean, String, String>(response.code() == 200, last_code, last_msg);
-                    } else {
-                        ret_value = new Tuple<Boolean, String, String>(false, "请求超时", "");
+                            ret_value = new Tuple<Boolean, String, String>(response.code() == 200, last_code, last_msg);
+                        } else {
+                            ret_value = new Tuple<Boolean, String, String>(false, "请求超时", "");
+                        }
+
+                        response.close();
+                        response = null;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        http_request_lock.unlock();
+                        semaphore.release();
                     }
-
-                    response.close();
-                    response = null;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    lock.unlock();
-                    semaphore.release();
                 }
-            }
-        }, "Thread_operate").start();
+            }, "Thread_operate").start();
 
-        semaphore.acquire();
-        System.gc();
-        return (Tuple<Boolean, String, String>) ret_value;
+            semaphore.acquire();
+            System.gc();
+            return (Tuple<Boolean, String, String>) ret_value;
+        } finally {
+            ret_value_lock.unlock();
+        }
     }
 
     /**
@@ -621,16 +635,16 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public boolean getLast() throws InterruptedException {
-        llock.lock();
+        ret_value_lock.lock();
         try {
             ret_value = null;
             Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    lock.lock();
+                    http_request_lock.lock();
                     try {
                         if (server_game_ip == null || server_game_port == -1 || token == null || uuid == null || game == null) {
-                            ret_value = new Tuple<Boolean, String, String>(false, "请创建或加入一个游戏", "");
+                            ret_value = false;
                             return;
                         }
 
@@ -713,7 +727,7 @@ public class Player {
                     } catch (Exception e) {
                         e.printStackTrace();
                     } finally {
-                        lock.unlock();
+                        http_request_lock.unlock();
                         semaphore.release();
                         System.gc();
                     }
@@ -725,8 +739,10 @@ public class Player {
             thread.interrupt();
             System.gc();
             return ret_value == null ? false : (boolean) ret_value;
+        } catch (Exception e) {
+            return false;
         } finally {
-            llock.unlock();
+            ret_value_lock.unlock();
         }
     }
 
@@ -742,7 +758,7 @@ public class Player {
      *                              sleeping, or otherwise occupied, and the thread is interrupted
      */
     public Tuple<Boolean, String, String> operate_update(GameOperation op, String card) throws InterruptedException {
-        plock.lock();
+        game_operate_lock.lock();
         try {
             Tuple<Boolean, String, String> ret = operate(op, card);
             /* perform the player's steps in the locally stored game */
@@ -767,89 +783,93 @@ public class Player {
             Log.v("play", this.host + " rest group " + game.card_group);
             return ret;
         } finally {
-            plock.unlock();
+            game_operate_lock.unlock();
         }
     }
 
     public Vector<String> gameList() throws InterruptedException {
+        ret_value_lock.lock();
+        try {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    http_request_lock.lock();
+                    try {
+                        ret_value = null;
+                        if (server_game_ip == null || server_game_port == -1 || token == null) {
+                            ret_value = new Tuple<Boolean, String, String>(false, "", "");
+                            return;
+                        }
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                lock.lock();
-                try {
-                    ret_value = null;
-                    if (server_game_ip == null || server_game_port == -1 || token == null) {
-                        ret_value = new Tuple<Boolean, String, String>(false, "", "");
-                        return;
-                    }
+                        String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/index"
+                            + "?page_size=10&page_num=1";
 
-                    String url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/index"
-                        + "?page_size=10&page_num=1";
-
-                    Request request = new Request.Builder()
-                        .url(url)
-                        .addHeader("Authorization", token)
-                        .addHeader("Connection", "close")
-                        .get()
-                        .build();
-                    Response response = client.newCall(request).execute();
-
-                    /*
-                       200/OK: success
-                       403/FORBIDDEN: game is waiting or error operation
-                     */
-                    if (response.isSuccessful()) {
-                        String res = response.body().string();
-                        JSONObject json = new JSONObject(res);
-                        JSONObject data = json.getJSONObject("data");
-                        int tot = data.getInt("total_page_num");
-
-                        url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/index"
-                            + "?page_size=10&page_num=" + tot;
-
-                        request = new Request.Builder()
+                        Request request = new Request.Builder()
                             .url(url)
                             .addHeader("Authorization", token)
                             .addHeader("Connection", "close")
                             .get()
                             .build();
+                        Response response = client.newCall(request).execute();
 
-                        response = client.newCall(request).execute();
-
-                        Vector<String> glist = new Vector<String>();
-
+                    /*
+                       200/OK: success
+                       403/FORBIDDEN: game is waiting or error operation
+                     */
                         if (response.isSuccessful()) {
-                            res = response.body().string();
-                            json = new JSONObject(res);
-                            data = json.getJSONObject("data");
-                            JSONArray list = data.getJSONArray("games");
+                            String res = response.body().string();
+                            JSONObject json = new JSONObject(res);
+                            JSONObject data = json.getJSONObject("data");
+                            int tot = data.getInt("total_page_num");
 
-                            for (int i = 0; i < list.length(); i++) {
-                                JSONObject _game = list.getJSONObject(i);
-                                glist.add(_game.getString("uuid"));
+                            url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/index"
+                                + "?page_size=10&page_num=" + tot;
+
+                            request = new Request.Builder()
+                                .url(url)
+                                .addHeader("Authorization", token)
+                                .addHeader("Connection", "close")
+                                .get()
+                                .build();
+
+                            response = client.newCall(request).execute();
+
+                            Vector<String> glist = new Vector<String>();
+
+                            if (response.isSuccessful()) {
+                                res = response.body().string();
+                                json = new JSONObject(res);
+                                data = json.getJSONObject("data");
+                                JSONArray list = data.getJSONArray("games");
+
+                                for (int i = 0; i < list.length(); i++) {
+                                    JSONObject _game = list.getJSONObject(i);
+                                    glist.add(_game.getString("uuid"));
+                                }
                             }
+
+                            ret_value = glist;
+                        } else {
+                            ret_value = new Vector<String>();
                         }
 
-                        ret_value = glist;
-                    } else {
-                        ret_value = new Vector<String>();
+                        response.close();
+                        response = null;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        http_request_lock.unlock();
+                        semaphore.release();
                     }
-
-                    response.close();
-                    response = null;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    lock.unlock();
-                    semaphore.release();
                 }
-            }
-        }, "Thread_gameList").start();
+            }, "Thread_gameList").start();
 
-        semaphore.acquire();
-        System.gc();
-        return (Vector<String>)ret_value;
+            semaphore.acquire();
+            System.gc();
+            return (Vector<String>) ret_value;
+        }finally {
+            ret_value_lock.unlock();
+        }
     }
 
     /**
@@ -874,6 +894,10 @@ public class Player {
         }
         return false;
     }
+
+    /******************************************
+     *            game interface              *
+     ******************************************/
 
     public int getWinner() {
         return game.winner;

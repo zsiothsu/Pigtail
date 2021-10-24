@@ -18,6 +18,6 @@ Open the project with Android Studio,and push `Build->Make Project`.
 ### command line:
 Execute this command in the root directory:
 ```shell
- ./gradlew app:build
+ ./gradlew app:assemble
 ```
-The first build will take some time. Output apk file is in `build/outputs/apk/release/`
+The first build will take some time. Output apk file is in `build/outputs/apk/`
