@@ -25,10 +25,10 @@
                     android:id="@+id/Text_username"
                     android:layout_width="match_parent"
                     android:layout_height="58dp"
-                    android:background="@android:color/transparent"
                     android:layout_marginHorizontal="30dp"
+                    android:background="@android:color/transparent"
                     android:inputType="text"
-                    android:maxLines="1"/>
+                    android:maxLines="1" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -44,18 +44,46 @@
                     android:id="@+id/Text_password"
                     android:layout_width="match_parent"
                     android:layout_height="58dp"
-                    android:background="@android:color/transparent"
                     android:layout_marginHorizontal="30dp"
+                    android:background="@android:color/transparent"
                     android:inputType="textPassword"
-                    android:maxLines="1"/>
+                    android:maxLines="1" />
 
             </com.google.android.material.textfield.TextInputLayout>
+
+            <RadioGroup
+                android:id="@+id/private_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/password_layout"
+                android:layout_marginHorizontal="30dp"
+                android:layout_marginTop="30dp"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/Button_public"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="公开对局"
+                    android:layout_marginLeft="30dp"
+                    android:textSize="20dp" />
+
+                <RadioButton
+                    android:id="@+id/Button_private"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="私有对局"
+                    android:layout_marginLeft="60dp"
+                    android:textSize="20dp" />
+
+            </RadioGroup>
 
             <TextView
                 android:id="@+id/Text_login_msg_box"
                 android:layout_width="match_parent"
                 android:layout_height="30dp"
-                android:layout_below="@+id/password_layout"
+                android:layout_below="@+id/private_layout"
                 android:layout_marginHorizontal="30dp"
                 android:layout_marginTop="30dp"
                 android:textSize="14dp" />

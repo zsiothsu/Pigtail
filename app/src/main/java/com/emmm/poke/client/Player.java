@@ -669,6 +669,7 @@ public class Player {
                                     String last_code = data.getString("last_code");
                                     boolean your_turn = data.getBoolean("your_turn");
 
+
                                     /* perform the player's steps in the locally stored game */
                                     String[] code = last_code.trim().split(" ");
                                     if (last_code.length() != 0 && (
@@ -696,25 +697,53 @@ public class Player {
                                 if (json.getInt("code") == 400) {
                                     Log.v("code", "400end");
 
-                                    if (game.card_group == 1) {
-                                        int base = 0;
-                                        if (game.rest_S == 1) base = 0;
-                                        else if (game.rest_H == 1) base = 13;
-                                        else if (game.rest_C == 1) base = 26;
-                                        else if (game.rest_D == 1) base = 39;
+                                    /* is time out */
+                                    url = "http://" + server_game_ip + ":" + server_game_port + "/api/game/" + uuid;
+                                    request = new Request.Builder()
+                                        .url(url)
+                                        .addHeader("Authorization", token)
+                                        .addHeader("Connection", "close")
+                                        .get()
+                                        .build();
+                                    response = client.newCall(request).execute();
+                                    res = response.body().string();
+                                    json = new JSONObject(res);
+                                    data = json.getJSONObject("data");
 
-                                        /* final card must be not in placement or player's card */
-                                        for (int i = base; i < base + 13; i++) {
-                                            String final_card = OneGame_Simple.card_new[i];
-                                            if (!game.card_at_p1.contains(final_card) &&
-                                                !game.card_at_p2.contains(final_card) &&
-                                                !game.card_placement.contains(final_card)) {
-                                                game.operate((host + 1) % 2, host, GameOperation.turnOver, final_card);
-                                                break;
+                                    if (!data.getString("top").contains("overtime")) {
+                                        /* for local server API */
+                                        if (game.card_group == 1) {
+                                            int base = 0;
+                                            if (game.rest_S == 1) base = 0;
+                                            else if (game.rest_H == 1) base = 13;
+                                            else if (game.rest_C == 1) base = 26;
+                                            else if (game.rest_D == 1) base = 39;
+
+                                            /* final card must be not in placement or player's card */
+                                            for (int i = base; i < base + 13; i++) {
+                                                String final_card = OneGame_Simple.card_new[i];
+                                                if (!game.card_at_p1.contains(final_card) &&
+                                                    !game.card_at_p2.contains(final_card) &&
+                                                    !game.card_placement.contains(final_card)) {
+                                                    game.operate((host + 1) % 2, host, GameOperation.turnOver, final_card);
+                                                    break;
+                                                }
                                             }
                                         }
+                                        ret_value = true;
+                                    } else {
+                                        String[] top = data.getString("top").trim().split(" ");
+
+                                        if(top[0].equals("0")) {
+                                            game.winner = 1;
+                                            game.finished = true;
+                                        } else if(top[0].equals("1")) {
+                                            game.winner = 0;
+                                            game.finished = true;
+                                        }
+
+                                        ret_value = true;
                                     }
-                                    ret_value = true;
                                 }
 
                             } else {
@@ -840,7 +869,11 @@ public class Player {
                                 res = response.body().string();
                                 json = new JSONObject(res);
                                 data = json.getJSONObject("data");
-                                JSONArray list = data.getJSONArray("games");
+
+                                JSONArray list;
+                                if(data.has("games"))
+                                     list = data.getJSONArray("games");
+                                else list = new JSONArray();
 
                                 for (int i = 0; i < list.length(); i++) {
                                     JSONObject _game = list.getJSONObject(i);
@@ -867,7 +900,7 @@ public class Player {
             semaphore.acquire();
             System.gc();
             return (Vector<String>) ret_value;
-        }finally {
+        } finally {
             ret_value_lock.unlock();
         }
     }

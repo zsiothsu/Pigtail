@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.RadioButton;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
@@ -46,6 +47,9 @@ public class CrateGameActivity extends Activity {
 
                 Player player = new Player(username, password);
 
+                RadioButton Button_private = findViewById(R.id.Button_private);
+                boolean private_status = Button_private.isChecked();
+
                 if (server_mode == 'S') {
                     player.setLoginServer("172.17.173.97", 8080);
                     player.setGameServer("172.17.173.97", 9000);
@@ -53,6 +57,8 @@ public class CrateGameActivity extends Activity {
                     player.setLoginServer("127.0.0.1", 9000);
                     player.setGameServer("127.0.0.1", 9000);
                 }
+
+
 
                 try {
                     boolean status = player.login();
@@ -66,13 +72,14 @@ public class CrateGameActivity extends Activity {
                         newIntent.putExtra("login_port", player.server_login_port);
                         newIntent.putExtra("game_port", player.server_game_port);
 
-                        String uuid = player.createGame(false);
+                        String uuid = player.createGame(private_status);
                         newIntent.putExtra("uuid", uuid);
 
                         newIntent.putExtra("username", player.username);
                         newIntent.putExtra("password", player.password);
 
                         newIntent.putExtra("game_mode", 'C');
+                        newIntent.putExtra("private", private_status);
 
                         newIntent.setClass(CrateGameActivity.this, player_with_remote.class);
                         startActivity(newIntent);

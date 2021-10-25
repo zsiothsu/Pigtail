@@ -548,7 +548,7 @@ public class LocalServer extends RouterNanoHTTPD {
                 HashMap<String, String> map = new HashMap<>();
                 session.parseBody(map);
 
-                String body = map.toString();
+                String body = map.get("postData");
                 JSONObject query = null;
                 if (body != null) {
                     query = new JSONObject(body);

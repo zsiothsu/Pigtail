@@ -23,6 +23,7 @@ import androidx.annotation.RequiresApi;
 import com.emmm.poke.client.Player;
 import com.emmm.poke.databinding.PlayerWithPlayerBinding;
 import com.emmm.poke.utils.GameOperation;
+import com.emmm.poke.utils.Tuple;
 
 import java.util.Vector;
 import java.util.concurrent.locks.Lock;
@@ -64,12 +65,14 @@ public class player_with_remote extends Activity {
         String password = intent.getStringExtra("password");
 
         char game_mode = intent.getCharExtra("game_mode", 'N');
+        boolean private_status = intent.getBooleanExtra("private", false);
 
         PA = new Player(username, password);
         PA.setLoginServer(serverip, login_port);
         PA.setGameServer(serverip, game_port);
         PA.token = token;
         PA.uuid = uuid;
+
 
         if(game_mode == 'J') {
             PA.host = 1;
@@ -108,7 +111,7 @@ public class player_with_remote extends Activity {
                         return;
                     }
                     try {
-                        Thread.sleep(3000);
+                        Thread.sleep(2000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -159,7 +162,7 @@ public class player_with_remote extends Activity {
             TextView t = findViewById(R.id.msg_box);
             t.setText(last_msg);
 
-            if (!has_card) {
+            if (PA.isGameOver()) {
                 thread_active = false;
                 int winner = PA.getWinner();
                 if (winner == 0) {
@@ -308,7 +311,8 @@ public class player_with_remote extends Activity {
                     String log = new String();
 
                     if (isP1) {
-                        log = PA.operate_update(GameOperation.turnOver, null).third;
+                        Tuple<Boolean, String, String> res = PA.operate_update(GameOperation.turnOver, null);
+                        log = res == null ? log : res.third;
                     }
                     TextView t = findViewById(R.id.msg_box);
                     t.setText(log);

@@ -138,9 +138,10 @@ public class JoinGameActivity extends Activity {
                     if (status) {
                         game_list = player.gameList();
 
+                        if(game_list.size() == 0) game_list.add("");
+
                         AlertDialog.Builder uuid_choose = new AlertDialog.Builder(JoinGameActivity.this);
                         uuid_choose.setTitle("游戏列表");
-
 
                         uuid_choose.setSingleChoiceItems(game_list.toArray(new String[0]), 0, new DialogInterface.OnClickListener() {
                             @Override
